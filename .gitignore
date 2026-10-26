@@ -1,0 +1,23 @@
+# Build output
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs and temporary files
+*.log
+*.tmp
+hs_err_pid*
+
+# Local experiment output (saved experiments you want to keep belong in examples/)
+/exports/

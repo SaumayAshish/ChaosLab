@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>dev.chaoslab</groupId>
+    <artifactId>chaoslab</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <name>ChaosLab</name>
+    <description>Interactive computational physics laboratory for the gravitational N-body problem and deterministic chaos.</description>
+
+    <properties>
+        <!-- Java 25 is the real compilation target. 'release' (not source/target) also pins the API surface to Java 25
+             and makes the build fail loudly on an older JDK instead of silently producing something else. -->
+        <java.release>25</java.release>
+        <maven.compiler.release>${java.release}</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Dependency and plugin versions are pinned in one place. See docs/adr (to be written) for the rationale. -->
+        <junit.version>5.14.1</junit.version>
+        <!-- 25.0.1 was confirmed to resolve from Maven Central (including the win classifier jars) on the target machine. -->
+        <javafx.version>25.0.1</javafx.version>
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
+        <javafx-maven-plugin.version>0.0.8</javafx-maven-plugin.version>
+    </properties>
+
+    <dependencies>
+        <!-- javafx-controls brings javafx-graphics and javafx-base transitively. The platform-specific native jars are
+             selected automatically through the classifier declared in the OpenJFX POMs. -->
+        <dependency>
+            <groupId>org.openjfx</groupId>
+            <artifactId>javafx-controls</artifactId>
+            <version>${javafx.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <release>${java.release}</release>
+                    <!-- Surface every lint warning; no preview features are enabled anywhere. -->
+                    <compilerArgs>
+                        <arg>-Xlint:all</arg>
+                    </compilerArgs>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+            </plugin>
+            <plugin>
+                <!-- Provides 'mvn javafx:run'. Starts the Launcher class, which then launches the JavaFX application. -->
+                <groupId>org.openjfx</groupId>
+                <artifactId>javafx-maven-plugin</artifactId>
+                <version>${javafx-maven-plugin.version}</version>
+                <configuration>
+                    <mainClass>dev.chaoslab.ui.Launcher</mainClass>
+                    <options>
+                        <!-- Silences the Java 24+ warning about JavaFX loading its native libraries. -->
+                        <option>--enable-native-access=javafx.graphics</option>
+                    </options>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
