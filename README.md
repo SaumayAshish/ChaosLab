@@ -16,6 +16,19 @@ The physics engine has no dependency on the user interface. The window only read
 > Status: working research prototype. 426 automated tests pass (see [Verification](#verification)). The JavaFX classes themselves
 > have no automated tests; they were checked by hand in the running window.
 
+## Screenshots
+
+![The Binary flyby with Dormand-Prince adaptive stepping, at t = 21.93](docs/images/binary-flyby-adaptive.png)
+
+*Binary flyby, Dormand-Prince 5(4) adaptive at tolerance 1e-10, paused at t = 21.93. The status lines read a gap to the
+high-accuracy reference of 1.51e-07 of the system size (about 6 digits of agreement), an energy drift of 3.2e-08, and a Lyapunov
+exponent of 0.348 per unit time. The right column shows the scenario editor with the generated explanation below it.*
+
+![The displaced Lagrange triangle at its starting state with velocity Verlet](docs/images/lagrange-start.png)
+
+*Lagrange triangle with body 1 displaced by 0.01, velocity Verlet with h = 0.005, at t = 0 before the first step: the numerical
+error is exactly zero because the displayed run is the reference's starting state. The preset note states the measured outcome.*
+
 ## What it does
 
 - Newtonian gravity in normalised units or SI units, for 2 to 8 bodies. Optional Plummer softening is always labelled non-Newtonian.
