@@ -1,5 +1,7 @@
 # ChaosLab
 
+[![CI](https://github.com/SaumayAshish/ChaosLab/actions/workflows/ci.yml/badge.svg)](https://github.com/SaumayAshish/ChaosLab/actions/workflows/ci.yml)
+
 An interactive desktop laboratory for the Newtonian N-body problem and deterministic chaos, written in Java 25 and JavaFX.
 
 ChaosLab is built to answer one question honestly: **when a simulated orbit looks wrong, is that physics or is it the numerics?**
@@ -65,6 +67,7 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - Test strength was checked by mutation: a deliberate fault was introduced into the code and the test run had to fail. Faults
   that survived led to stronger tests or to removal of dead code (recorded in the milestone log).
 - Convergence orders measured: Euler 0.99, RK4 4.06, Verlet 2.00, Dormand-Prince fixed step 5.15 to 5.34.
+- The first continuous-integration run (2026-10-26) passed on Ubuntu and Windows.
 - See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for exactly what is and is not claimed.
 
 ## Documentation
@@ -82,4 +85,4 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 
 ## Licence
 
-No licence has been chosen yet. Until a `LICENSE` file is added, all rights are reserved by the author.
+MIT. See [LICENSE](LICENSE).

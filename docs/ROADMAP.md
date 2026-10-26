@@ -8,7 +8,7 @@ Ordered by how much each item improves the science or the trust in it, not by ho
 2. Check the nine presets against the original list of required experiments, and add any that are missing.
 3. See and fix the remaining visual defects: legend and label overlaps in the orbit view and the error plot, number fields that clip
    long values, the control bar wrapping in narrow windows.
-4. Add a licence (see the note in the project hand-over) and screenshots taken from the running application.
+4. Add screenshots taken from the running application.
 
 ## Then
 - Apply of an edited custom scenario, and the "Reference (ghost)" switch turned off: both compile and are specified but have not
