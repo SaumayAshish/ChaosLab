@@ -76,8 +76,9 @@ public final class ConfigPanel extends VBox {
 
     private static final double PANEL_WIDTH = 560.0;
     private static final String CUSTOM_TITLE = "Custom scenario";
-    private static final String GENERAL_NOTE = "Chaotic orbits have a finite predictability horizon: a small"
-            + " numerical error grows exponentially, so conserved energy does not by itself mean the trajectory is"
+    private static final String GENERAL_NOTE = "Whether this scenario is regular or chaotic is not known in advance:"
+            + " the sensitivity line reports what was measured. In chaotic motion a small numerical error grows"
+            + " exponentially, and in any motion a small energy drift does not by itself mean the positions are"
             + " correct.";
     /** The law every scenario obeys; a preset's own equations follow it. ASCII only, so it renders everywhere. */
     private static final String COMMON_EQUATIONS = "Force on body i: a_i = G sum over j != i of m_j (r_j - r_i) /"
@@ -182,7 +183,9 @@ public final class ConfigPanel extends VBox {
                     () -> ScenarioDraft.of(LongTermOrbit.system(), LongTermOrbit.state(), LongTermOrbit.STEP),
                     "A planet (mass 0.001) on an exact Kepler ellipse (a = 1, e = 0.5, period 6.2800) round a star"
                             + " of mass 1, started at periapsis. The exact motion repeats and conserves energy, so"
-                            + " every drift you see is the integrator's. Measured over 100 orbits at h = 0.02 (314"
+                            + " every drift you see is the integrator's. The amber step-size warning is expected: h ="
+                            + " 0.02 is slightly coarser than the rule of thumb (0.0177 at periapsis), chosen so the"
+                            + " methods separate within a hundred orbits. Measured over 100 orbits at h = 0.02 (314"
                             + " steps per orbit) against a 1e-13 reference: Velocity Verlet's energy error stays"
                             + " bounded (1.1e-3 at most) and its angular momentum is conserved to 3e-14, but its"
                             + " planet drifts ahead in phase (position off by 1.3 after 100 orbits). RK4 loses"

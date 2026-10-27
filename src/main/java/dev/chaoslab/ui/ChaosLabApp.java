@@ -152,6 +152,7 @@ public final class ChaosLabApp extends Application {
     private Snapshot latestSnapshot;
     private long lastExplainNanos;
     private String lastExplainKey = "";
+    private final DriftExtremes driftExtremes = new DriftExtremes();
 
     private Stage stage;
     private File lastDirectory;
@@ -312,6 +313,7 @@ public final class ChaosLabApp extends Application {
         stepButton.setOnAction(e -> runner.step(stepCountBox.getValue()));
         resetButton.setOnAction(e -> {
             runner.reset();
+            driftExtremes.reset();
             view.clearTrails();
             if (monitor != null) {
                 monitor.reset();
@@ -361,6 +363,8 @@ public final class ChaosLabApp extends Application {
                     view.show(s);
                     history.offer(s.stepCount(), s.state().time() / timeScale, s.drift().relativeEnergy(),
                             s.drift().relativeMomentum(), s.drift().relativeAngularMomentum());
+                    driftExtremes.offer(s.drift().relativeEnergy(), s.drift().relativeMomentum(),
+                            s.drift().relativeAngularMomentum());
                     plot.show(history);
                     updateTelemetry(s);
                     latestPositions = s.state().positions();
@@ -422,8 +426,8 @@ public final class ChaosLabApp extends Application {
         Explanation.Facts facts = new Explanation.Facts(
                 s.status() == Snapshot.Status.FAILED, s.failure(), integratorBox.getValue().tolerances() != null,
                 timeScale == 1.0 ? "t" : "d",
-                Math.abs(s.drift().relativeEnergy()), s.drift().relativeMomentum(),
-                s.drift().relativeAngularMomentum(), applied.scenario().system().softening(),
+                driftExtremes.energy(), driftExtremes.momentum(),
+                driftExtremes.angularMomentum(), applied.scenario().system().softening(),
                 r == null ? Double.NaN : r.relativeGap(), r == null ? Double.NaN : r.relativeUncertainty(),
                 r == null ? null : r.referenceFailure(), verdict, lambda, r == null ? 0 : r.renormalisations(),
                 twinMonitor != null && t != null && t.failure() == null ? t.relativeSeparation() : Double.NaN);
@@ -681,6 +685,7 @@ public final class ChaosLabApp extends Application {
         view.setSystem(system);
         populateFrameBox(system.bodyCount());
         history.clear();
+        driftExtremes.reset();
         plot.show(history);
         lastSequence = -1;
         aligner.clear();
