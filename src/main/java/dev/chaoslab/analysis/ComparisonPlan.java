@@ -12,6 +12,7 @@ import dev.chaoslab.physics.State;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 
 /**
  * Turns "compare the integrators on this scenario for this long" into a concrete {@link IntegratorComparison} run and
@@ -19,8 +20,8 @@ import java.util.Locale;
  * class decides, and all of it is tested.
  *
  * <p>Four methods are compared at one common fixed step: Euler, RK4, Velocity Verlet and Dormand-Prince 5(4) used with
- * a fixed step. The adaptive Dormand-Prince is not in the list because {@link IntegratorComparison} compares fixed
- * steps; the main window runs it.
+ * a fixed step. A fifth row runs the adaptive Dormand-Prince at tolerance {@link #ADAPTIVE_TOLERANCE}; it chooses its own
+ * steps, so its step size in the table is the mean accepted step and its cost is not comparable to the fixed rows.
  *
  * <p>The step the person chose is honoured as closely as the sampling allows: the duration is split into
  * {@link #SAMPLES} equal intervals (fewer if the duration is only a few steps), each holding a whole number of steps,
@@ -34,6 +35,9 @@ public final class ComparisonPlan {
 
     /** The most steps any one method may take; the reference needs far more work per step, so this bounds the wait. */
     public static final long MAX_STEPS_PER_METHOD = 1_000_000L;
+
+    /** Absolute and relative tolerance of the adaptive row. */
+    public static final double ADAPTIVE_TOLERANCE = 1e-10;
 
     /** A method whose total energy changes by more than this fraction has left the true motion. */
     public static final double ENERGY_VALID_LIMIT = 0.1;
@@ -73,14 +77,19 @@ public final class ComparisonPlan {
         return new Plan(duration, samples, (int) perSample, duration / steps, steps);
     }
 
-    /** The four methods, all at the same fixed step (the plan's step is applied through steps per sample). */
+    /**
+     * The four fixed-step methods, all at the same step (applied through steps per sample), then the adaptive
+     * Dormand-Prince at {@link #ADAPTIVE_TOLERANCE}.
+     */
     public static List<MethodSpec> specs(Plan plan) {
         int n = plan.stepsPerSample();
         return List.of(
                 new MethodSpec("Euler", EulerIntegrator::new, n),
                 new MethodSpec("RK4", Rk4Integrator::new, n),
                 new MethodSpec("Velocity Verlet", VelocityVerletIntegrator::new, n),
-                new MethodSpec("Dormand-Prince, fixed h", DormandPrince45Integrator::new, n));
+                new MethodSpec("Dormand-Prince, fixed h", DormandPrince45Integrator::new, n),
+                MethodSpec.adaptive("Dormand-Prince, adaptive", new DormandPrince45Integrator.Tolerances(
+                        ADAPTIVE_TOLERANCE, ADAPTIVE_TOLERANCE)));
     }
 
     /**
@@ -91,8 +100,19 @@ public final class ComparisonPlan {
      *         very close encounter inside the interval)
      */
     public static Report run(NBodySystem system, State start, double requestedStep, double duration) {
+        return run(system, start, requestedStep, duration, () -> false);
+    }
+
+    /**
+     * As {@link #run(NBodySystem, State, double, double)}, polling {@code cancelled} between sampling intervals.
+     *
+     * @throws java.util.concurrent.CancellationException if {@code cancelled} returned true
+     */
+    public static Report run(NBodySystem system, State start, double requestedStep, double duration,
+                             BooleanSupplier cancelled) {
         Plan plan = plan(requestedStep, duration);
-        return IntegratorComparison.run(system, start, start.time() + duration, plan.samples(), specs(plan));
+        return IntegratorComparison.run(system, start, start.time() + duration, plan.samples(), specs(plan),
+                cancelled);
     }
 
     /**

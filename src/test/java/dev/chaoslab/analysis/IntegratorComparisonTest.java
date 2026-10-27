@@ -240,4 +240,77 @@ class IntegratorComparisonTest {
         assertThrows(IllegalArgumentException.class, () -> new MethodSpec("x", null, 1));
         assertThrows(IllegalArgumentException.class, () -> new MethodSpec("x", EulerIntegrator::new, 0));
     }
+
+    // ---------------------------------------------------------------- adaptive method and cancellation
+
+    private static final DormandPrince45Integrator.Tolerances TOL = new DormandPrince45Integrator.Tolerances(1e-10, 1e-10);
+
+    @Test
+    void anAdaptiveSpecRunsAtTheSameSampleTimesAndReportsItsMeanStep() {
+        Report r = IntegratorComparison.run(system(), orbit(1.0), 20.0, 10,
+                List.of(MethodSpec.adaptive("DP adaptive", TOL), new MethodSpec("Verlet", VelocityVerletIntegrator::new, 100)));
+        MethodResult a = find(r, "DP adaptive");
+        assertTrue(a.completed(), a.failure());
+        assertTrue(a.methodName().contains("adaptive"), a.methodName());
+        assertEquals(11, a.samples().size());
+        for (int k = 0; k <= 10; k++) {
+            assertEquals(2.0 * k, a.samples().get(k).time(), 1e-12);
+        }
+        assertTrue(a.stepsCompleted() >= 10 && a.stepsCompleted() < 100_000, "steps " + a.stepsCompleted());
+        assertEquals(20.0, a.stepSize() * a.stepsCompleted(), 1e-9); // the mean step times the steps covers the run
+        assertTrue(a.maxAbsEnergyDrift() < 1e-7, "dE " + a.maxAbsEnergyDrift());
+        assertTrue(a.last().separationFromReference() < 1e-5, "sep " + a.last().separationFromReference());
+    }
+
+    @Test
+    void anAdaptiveSpecCountsTheStepsOfAnIndependentAdaptiveRunSampleBySample() {
+        Report r = IntegratorComparison.run(system(), orbit(1.0), 20.0, 10, List.of(MethodSpec.adaptive("A", TOL)));
+        DormandPrince45Integrator dp = new DormandPrince45Integrator();
+        State current = orbit(1.0);
+        long steps = 0;
+        for (int k = 1; k <= 10; k++) {
+            DormandPrince45Integrator.AdaptiveResult x = dp.integrate(system(), current, 2.0 * k, 0.2, TOL, 5_000_000);
+            steps += (long) x.acceptedSteps() + x.rejectedSteps() + 1L; // the +1 is the shortened final step
+            current = x.finalState();
+        }
+        assertEquals(steps, find(r, "A").stepsCompleted());
+    }
+
+    @Test
+    void anAdaptiveSpecMustHaveTolerances() {
+        assertThrows(IllegalArgumentException.class, () -> MethodSpec.adaptive("x", null));
+        assertThrows(IllegalArgumentException.class, () -> MethodSpec.adaptive(" ", TOL));
+    }
+
+    @Test
+    void aSupplierThatNeverCancelsGivesTheSameResultAsThePlainRun() {
+        List<MethodSpec> specs = List.of(MethodSpec.adaptive("A", TOL), new MethodSpec("V", VelocityVerletIntegrator::new, 50));
+        Report plain = IntegratorComparison.run(system(), orbit(1.0), 10.0, 5, specs);
+        Report polled = IntegratorComparison.run(system(), orbit(1.0), 10.0, 5, specs, () -> false);
+        assertEquals(plain.toCsv(), polled.toCsv());
+    }
+
+    @Test
+    void cancellationIsPolledOncePerIntervalForTheReferencesAndEveryMethod() {
+        List<MethodSpec> specs = List.of(MethodSpec.adaptive("A", TOL), new MethodSpec("V", VelocityVerletIntegrator::new, 50));
+        int[] polls = {0};
+        IntegratorComparison.run(system(), orbit(1.0), 10.0, 5, specs, () -> {
+            polls[0]++;
+            return false;
+        });
+        assertEquals(5 + 5 + 5 * specs.size(), polls[0]); // tight reference, loose reference, then each method
+    }
+
+    @Test
+    void cancellingAtAnyPollEndsTheRunWithACancellationException() {
+        List<MethodSpec> specs = List.of(MethodSpec.adaptive("A", TOL), new MethodSpec("V", VelocityVerletIntegrator::new, 50));
+        int total = 5 + 5 + 5 * specs.size();
+        for (int cancelAt : new int[] {1, 6, 11, 16, total}) { // in the references, the adaptive and the fixed loops
+            int[] polls = {0};
+            assertThrows(java.util.concurrent.CancellationException.class,
+                    () -> IntegratorComparison.run(system(), orbit(1.0), 10.0, 5, specs, () -> ++polls[0] >= cancelAt),
+                    "cancelAt " + cancelAt);
+            assertEquals(cancelAt, polls[0]); // no further work after the cancel
+        }
+    }
 }

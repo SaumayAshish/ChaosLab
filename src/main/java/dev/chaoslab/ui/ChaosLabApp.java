@@ -144,6 +144,9 @@ public final class ChaosLabApp extends Application {
     private final ComboBox<String> frameBox = new ComboBox<>();
     private boolean updatingFrameBox;
     private final CheckBox twinBox = new CheckBox("Twin run");
+    private final ComboBox<String> twinBodyBox = new ComboBox<>();
+    private final ComboBox<TwinRun.Direction> twinDirectionBox = new ComboBox<>();
+    private boolean updatingTwinBoxes;
     private final GapHistory twinHistory = new GapHistory(GAP_CAPACITY);
     private final Label twinLine = new Label();
     private final Label fileLine = new Label();
@@ -164,6 +167,7 @@ public final class ChaosLabApp extends Application {
     private ReferenceMonitor.Reading lastReading;
     private TwinMonitor twinMonitor;
     private TwinRun.Reading lastTwin;
+    private TwinRun.Nudge twinNudge = TwinRun.Nudge.DEFAULT;
     private NBodySystem twinSystem;
     private State twinStart;
     private double[] latestPositions;
@@ -251,6 +255,7 @@ public final class ChaosLabApp extends Application {
                 new Label("Speed"), speedSlider, speedLabel, new Label("Integrator"), integratorBox,
                 new Label("Frame"), frameBox,
                 fitButton, resetViewButton, autoFitBox, trailsBox, vectorsBox, ghostBox, twinBox,
+                new Label("nudge"), twinBodyBox, twinDirectionBox,
                 compareButton, saveButton, loadButton, exportButton);
         controls.setPadding(new Insets(8, 14, 10, 14));
         controls.setStyle("-fx-alignment: center-left;");
@@ -330,6 +335,21 @@ public final class ChaosLabApp extends Application {
             gapPlot.showTwin(twinMonitor == null ? null : twinHistory);
         });
         twinBox.setOnAction(e -> restartTwin());
+        twinDirectionBox.getItems().addAll(TwinRun.Direction.values());
+        twinDirectionBox.getSelectionModel().select(TwinRun.Direction.PLUS_X);
+        twinBodyBox.setTooltip(new Tooltip("Which body the twin run moves by 1e-6 of the system size."));
+        twinDirectionBox.setTooltip(new Tooltip("Which way the nudged body is moved. The exponential growth rate in"
+                + " chaotic motion does not depend on this; the detailed curve does."));
+        twinBodyBox.setOnAction(e -> {
+            if (!updatingTwinBoxes) {
+                restartTwin();
+            }
+        });
+        twinDirectionBox.setOnAction(e -> {
+            if (!updatingTwinBoxes) {
+                restartTwin();
+            }
+        });
         saveButton.setOnAction(e -> saveExperiment());
         loadButton.setOnAction(e -> loadExperiment());
         exportButton.setOnAction(e -> exportCsv());
@@ -662,6 +682,28 @@ public final class ChaosLabApp extends Application {
         }
     }
 
+    /** Lists one nudge target per body and goes back to body 1; the direction choice is kept. */
+    private void populateTwinBodyBox(int bodyCount) {
+        updatingTwinBoxes = true;
+        try {
+            twinBodyBox.getItems().clear();
+            for (int i = 1; i <= bodyCount; i++) {
+                twinBodyBox.getItems().add("m" + i);
+            }
+            twinBodyBox.getSelectionModel().select(0);
+        } finally {
+            updatingTwinBoxes = false;
+        }
+    }
+
+    /** The nudge chosen in the two boxes; body 1 along +x if nothing is selected yet. */
+    private TwinRun.Nudge chosenNudge() {
+        int body = Math.max(0, twinBodyBox.getSelectionModel().getSelectedIndex());
+        TwinRun.Direction direction = twinDirectionBox.getValue() == null
+                ? TwinRun.Direction.PLUS_X : twinDirectionBox.getValue();
+        return new TwinRun.Nudge(body, direction);
+    }
+
     /** (Re)creates the runner for the applied scenario and the selected integrator, from the initial state. */
     private void startRunner() {
         if (runner != null) {
@@ -678,12 +720,13 @@ public final class ChaosLabApp extends Application {
         IntegratorOption option = integratorBox.getValue();
         SimulationConfig config = option.tolerances() == null
                 ? new SimulationConfig(system, scenario.initial(), option.factory(), scenario.stepSize(),
-                SimulationConfig.UNBOUNDED, currentSpeed())
+                        SimulationConfig.UNBOUNDED, currentSpeed())
                 : SimulationConfig.adaptive(system, scenario.initial(), option.factory(), scenario.stepSize(),
-                option.tolerances(), SimulationConfig.UNBOUNDED, currentSpeed());
+                        option.tolerances(), SimulationConfig.UNBOUNDED, currentSpeed());
         runner = new SimulationRunner(config);
         view.setSystem(system);
         populateFrameBox(system.bodyCount());
+        populateTwinBodyBox(system.bodyCount());
         history.clear();
         driftExtremes.reset();
         plot.show(history);
@@ -720,7 +763,8 @@ public final class ChaosLabApp extends Application {
         twinLine.setVisible(true);
         twinLine.setManaged(true);
         try {
-            twinMonitor = new TwinMonitor(twinSystem, twinStart);
+            twinMonitor = new TwinMonitor(twinSystem, twinStart, chosenNudge());
+            twinNudge = chosenNudge();
             gapPlot.showTwin(twinHistory);
             twinLine.setStyle(VIOLET);
             twinLine.setText("TWIN RUN   waiting for the first reading...");
@@ -966,9 +1010,9 @@ public final class ChaosLabApp extends Application {
         double separation = r.relativeSeparation();
         double growth = separation / TwinRun.NUDGE;
         StringBuilder text = new StringBuilder(String.format(Locale.ROOT,
-                "TWIN RUN   m1 nudged by %.0e of the system size   separation now %.2e of the system size"
+                "TWIN RUN   %s nudged by %.0e of the system size   separation now %.2e of the system size"
                         + " (x%.3g since the start)",
-                TwinRun.NUDGE, separation, growth));
+                twinNudge.label(), TwinRun.NUDGE, separation, growth));
         ReferenceMonitor.Reading ly = lastReading;
         double uncertainty = ly == null ? Double.NaN : ly.relativeUncertainty();
         if (!Double.isNaN(uncertainty) && separation <= uncertainty) {

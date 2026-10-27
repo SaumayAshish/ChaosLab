@@ -104,4 +104,28 @@ class TwinMonitorTest {
             assertThrows(IllegalArgumentException.class, () -> m.submit(Double.POSITIVE_INFINITY));
         }
     }
+    @Test
+    void aChosenNudgeIsUsedAndSurvivesAReset() throws InterruptedException {
+        TwinRun.Nudge nudge = new TwinRun.Nudge(1, TwinRun.Direction.MINUS_Y);
+        TwinRun.Reading direct = new TwinRun(LagrangeTriangle.system(), LagrangeTriangle.state(0.01), nudge).at(20.0);
+        TwinRun.Reading standard = new TwinRun(LagrangeTriangle.system(), LagrangeTriangle.state(0.01)).at(20.0);
+        assertTrue(direct.separation() != standard.separation());
+        try (TwinMonitor m = new TwinMonitor(LagrangeTriangle.system(), LagrangeTriangle.state(0.01), nudge)) {
+            m.submit(20.0);
+            assertEquals(direct.separation(), await(m, 20.0).separation(), 0.0);
+            m.reset(); // rebuilds the pair on the next request: it must keep the nudge
+            m.submit(20.0);
+            TwinRun.Reading again = await(m, 20.0);
+            assertEquals(direct.separation(), again.separation(), 0.0);
+            assertTrue(java.util.Arrays.equals(direct.offsets(), again.offsets()));
+        }
+    }
+
+    @Test
+    void anInvalidNudgeIsRejectedByTheConstructor() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new TwinMonitor(FigureEight.system(), FigureEight.state(), null));
+        assertThrows(IllegalArgumentException.class, () -> new TwinMonitor(FigureEight.system(), FigureEight.state(),
+                new TwinRun.Nudge(3, TwinRun.Direction.PLUS_X)));
+    }
 }

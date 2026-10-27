@@ -154,4 +154,83 @@ class TwinRunTest {
         first[0] = 99.0;
         assertEquals(TwinRun.NUDGE * 2.0, r.offsets()[0], 1e-14);
     }
+    @Test
+    void everyDirectionMovesExactlyTheChosenComponentOfTheChosenBody() {
+        State s = FigureEight.state();
+        double shift = TwinRun.NUDGE * TwinRun.characteristicLength(s);
+        double[] q = s.positions();
+        for (int body = 0; body < s.bodyCount(); body++) {
+            for (TwinRun.Direction d : TwinRun.Direction.values()) {
+                State n = TwinRun.nudged(s, new TwinRun.Nudge(body, d));
+                double[] p = n.positions();
+                for (int i = 0; i < q.length; i++) {
+                    double expected = i == 3 * body + d.axis() ? d.sign() * shift : 0.0;
+                    assertEquals(expected, p[i] - q[i], 1e-15, "body " + body + " " + d + " component " + i);
+                }
+                assertArrayEquals(s.velocities(), n.velocities(), 0.0);
+            }
+        }
+    }
+
+    @Test
+    void theDirectionsHaveTheirAxesAndSigns() {
+        assertEquals(0, TwinRun.Direction.PLUS_X.axis());
+        assertEquals(1, TwinRun.Direction.MINUS_Y.axis());
+        assertEquals(2, TwinRun.Direction.PLUS_Z.axis());
+        assertEquals(1.0, TwinRun.Direction.PLUS_Y.sign(), 0.0);
+        assertEquals(-1.0, TwinRun.Direction.MINUS_Z.sign(), 0.0);
+        assertEquals("-x", TwinRun.Direction.MINUS_X.toString());
+    }
+
+    @Test
+    void theDefaultNudgeIsBodyZeroAlongPlusXAndChangesNothingForExistingCallers() {
+        State s = FigureEight.state();
+        assertArrayEquals(TwinRun.nudged(s).positions(), TwinRun.nudged(s, TwinRun.Nudge.DEFAULT).positions(), 0.0);
+        assertEquals(0, TwinRun.Nudge.DEFAULT.body());
+        assertEquals(TwinRun.Direction.PLUS_X, TwinRun.Nudge.DEFAULT.direction());
+        TwinRun a = new TwinRun(FigureEight.system(), s);
+        TwinRun b = new TwinRun(FigureEight.system(), s, TwinRun.Nudge.DEFAULT);
+        assertEquals(a.at(5.0).separation(), b.at(5.0).separation(), 0.0);
+    }
+
+    @Test
+    void aChosenNudgeStartsTheOffsetOnTheChosenComponentOnly() {
+        TwinRun t = new TwinRun(FigureEight.system(), FigureEight.state(),
+                new TwinRun.Nudge(2, TwinRun.Direction.MINUS_Y));
+        double[] offsets = t.at(0.0).offsets();
+        for (int i = 0; i < offsets.length; i++) {
+            double expected = i == 3 * 2 + 1 ? -t.initialSeparation() : 0.0;
+            assertEquals(expected, offsets[i], 1e-14, "component " + i);
+        }
+        assertEquals(t.initialSeparation(), t.at(0.0).separation(), 1e-14);
+    }
+
+    @Test
+    void differentChoicesGiveDifferentCurvesButBothAmplifyTheNudge() {
+        TwinRun plusX = new TwinRun(LagrangeTriangle.system(), LagrangeTriangle.state(0.01));
+        TwinRun minusY = new TwinRun(LagrangeTriangle.system(), LagrangeTriangle.state(0.01),
+                new TwinRun.Nudge(1, TwinRun.Direction.MINUS_Y));
+        double a = plusX.at(30.0).relativeSeparation();
+        double b = minusY.at(30.0).relativeSeparation();
+        assertTrue(Math.abs(a - b) > 1e-3 * Math.max(a, b), "a=" + a + " b=" + b);
+        assertTrue(a > 1e3 * TwinRun.NUDGE && b > 1e3 * TwinRun.NUDGE, "a=" + a + " b=" + b);
+    }
+
+    @Test
+    void invalidNudgesAreRejected() {
+        assertThrows(IllegalArgumentException.class, () -> new TwinRun.Nudge(-1, TwinRun.Direction.PLUS_X));
+        assertThrows(IllegalArgumentException.class, () -> new TwinRun.Nudge(0, null));
+        assertThrows(IllegalArgumentException.class, () -> new TwinRun(FigureEight.system(), FigureEight.state(), null));
+        TwinRun.Nudge outside = new TwinRun.Nudge(3, TwinRun.Direction.PLUS_X);
+        assertThrows(IllegalArgumentException.class,
+                () -> new TwinRun(FigureEight.system(), FigureEight.state(), outside));
+        assertThrows(IllegalArgumentException.class, () -> TwinRun.nudged(FigureEight.state(), outside));
+        new TwinRun.Nudge(2, TwinRun.Direction.PLUS_Z); // the last body is allowed
+    }
+
+    @Test
+    void theLabelNumbersBodiesFromOne() {
+        assertEquals("m1 along +x", TwinRun.Nudge.DEFAULT.label());
+        assertEquals("m3 along -z", new TwinRun.Nudge(2, TwinRun.Direction.MINUS_Z).label());
+    }
 }

@@ -34,6 +34,7 @@ public final class TwinMonitor implements AutoCloseable {
     private volatile TwinRun.Reading latest;
 
     // used only by the monitor thread
+    private final TwinRun.Nudge nudge;
     private TwinRun twin;
     private int builtGeneration;
 
@@ -44,12 +45,23 @@ public final class TwinMonitor implements AutoCloseable {
      * @throws IllegalArgumentException                   for null arguments
      */
     public TwinMonitor(NBodySystem system, State start) {
-        if (system == null || start == null) {
-            throw new IllegalArgumentException("system and start state must not be null");
+        this(system, start, TwinRun.Nudge.DEFAULT);
+    }
+
+    /**
+     * Like {@link #TwinMonitor(NBodySystem, State)} with a chosen body and direction for the nudge.
+     *
+     * @throws NBodySystem.SingularConfigurationException if either start state is singular
+     * @throws IllegalArgumentException                   for null arguments or a body outside the system
+     */
+    public TwinMonitor(NBodySystem system, State start, TwinRun.Nudge nudge) {
+        if (system == null || start == null || nudge == null) {
+            throw new IllegalArgumentException("system, start state and nudge must not be null");
         }
         this.system = system;
         this.start = start;
-        this.twin = new TwinRun(system, start);
+        this.nudge = nudge;
+        this.twin = new TwinRun(system, start, nudge);
         this.thread = new Thread(this::loop, "chaoslab-twin-monitor");
         this.thread.setDaemon(true);
         this.thread.start();
@@ -136,7 +148,7 @@ public final class TwinMonitor implements AutoCloseable {
                 pending = null;
             }
             if (request.generation() != builtGeneration) {
-                twin = new TwinRun(system, start);
+                twin = new TwinRun(system, start, nudge);
                 builtGeneration = request.generation();
             }
             TwinRun.Reading reading;

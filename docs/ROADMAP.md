@@ -5,17 +5,12 @@ Ordered by how much each item improves the science or the trust in it, not by ho
 ## Next
 1. Read the CI job log of a green run and record the test count per operating system (run #6 passed on Temurin 25, but the
    count has not yet been read from the log).
-2. Extend the in-window integrator comparison. All seven experiments of the original brief are now covered (stable orbit,
-   figure-eight, chaotic scattering, nearby initial conditions, integrator comparison, close encounter, long-term integration),
-   each with its equations. Still missing: the adaptive Dormand-Prince as a row of the comparison (the engine compares fixed
-   steps only), cancelling a long comparison, and a plot of the comparison samples.
-3. Fix the remaining visual defects: number fields that clip long values, and the control bar wrapping in narrow windows.
-   (The legend and label overlaps were fixed on 2026-10-27.)
+2. Fix the remaining visual defects: the control bar wrapping in narrow windows and number fields that still clip values
+   longer than about 11 characters. (Legend and label overlaps were fixed and the fields widened on 2026-10-27.)
 
 ## Then
-- Apply of an edited custom scenario, and the "Reference (ghost)" switch turned off: both compile and are specified but have not
-  yet been watched in the running window.
-- Twin run: trails, rings included in the auto-fit, a choice of which body and direction to nudge.
+- Watch the new comparison plot, the adaptive row, Cancel, and the twin nudge selectors and trails in the running window
+  (they compile and their logic is tested; the drawing has not been looked at yet).
 - An `AdaptiveIntegrator` interface, once a second adaptive method exists (today adaptive stepping needs Dormand-Prince).
 - A loaded scenario that carries a start time (files currently always start at 0).
 

@@ -77,12 +77,12 @@ public final class OrbitView extends Region {
     /** Approximate width of one character of the 11 px monospaced legend font, used to size the plate behind it. */
     private static final double LEGEND_CHARACTER_WIDTH = 6.7;
     private static final Color[] PALETTE = {
-            Color.web("#22d3ee"), // cyan
-            Color.web("#a78bfa"), // violet
-            Color.web("#fbbf24"), // amber
-            Color.web("#34d399"),
-            Color.web("#fb7185"),
-            Color.web("#60a5fa")
+        Color.web("#22d3ee"), // cyan
+        Color.web("#a78bfa"), // violet
+        Color.web("#fbbf24"), // amber
+        Color.web("#34d399"),
+        Color.web("#fb7185"),
+        Color.web("#60a5fa")
     };
 
     private final Canvas canvas = new Canvas();
@@ -95,6 +95,7 @@ public final class OrbitView extends Region {
     private NBodySystem system;
     private TrailBuffer trails;
     private TrailBuffer ghostTrails;
+    private TrailBuffer twinTrails;
     private double[] ghostPositions;
     private double[] twinPositions;
     private double ghostTime = Double.NaN;
@@ -178,6 +179,7 @@ public final class OrbitView extends Region {
         this.system = newSystem;
         this.trails = new TrailBuffer(newSystem.bodyCount(), TRAIL_CAPACITY);
         this.ghostTrails = new TrailBuffer(newSystem.bodyCount(), TRAIL_CAPACITY);
+        this.twinTrails = new TrailBuffer(newSystem.bodyCount(), TRAIL_CAPACITY);
         this.ghostPositions = null;
         this.twinPositions = null;
         this.ghostTime = Double.NaN;
@@ -260,6 +262,9 @@ public final class OrbitView extends Region {
     /**
      * Shows (or, with null, hides) the twin rings.
      *
+     * Each usable call also adds a point to the twin's trails; hiding the rings (null or unusable positions) clears
+     * them, so the trails always belong to one uninterrupted twin run.
+     *
      * @param positions flat positions (x0, y0, z0, x1, ...) of all bodies in the twin run, in the same coordinates as
      *                  the displayed bodies; null, of the wrong length or not finite hides the rings
      */
@@ -272,6 +277,13 @@ public final class OrbitView extends Region {
             usable = Double.isFinite(positions[3 * i]) && Double.isFinite(positions[3 * i + 1]);
         }
         twinPositions = usable ? positions.clone() : null;
+        if (twinTrails != null) {
+            if (usable) {
+                twinTrails.append(twinPositions);
+            } else {
+                twinTrails.clear();
+            }
+        }
         redraw();
     }
 
@@ -291,6 +303,7 @@ public final class OrbitView extends Region {
             ghostTrails.clear();
             ghostPositions = null;
             twinPositions = null;
+            twinTrails.clear();
             ghostTime = Double.NaN;
             lastTrailStep = 0;
         } else if (steps > lastTrailStep) {
@@ -371,6 +384,20 @@ public final class OrbitView extends Region {
                 }
             }
         }
+        if (showTrails.get() && twinPositions != null && twinTrails != null) {
+            double[] tb = new double[4];
+            if (ReferenceFrame.bounds(twinTrails, frame, tb)) {
+                if (have) {
+                    b[0] = Math.min(b[0], tb[0]);
+                    b[1] = Math.max(b[1], tb[1]);
+                    b[2] = Math.min(b[2], tb[2]);
+                    b[3] = Math.max(b[3], tb[3]);
+                } else {
+                    System.arraycopy(tb, 0, b, 0, 4);
+                    have = true;
+                }
+            }
+        }
         if (have) {
             camera.fit(b[0], b[1], b[2], b[3], FIT_MARGIN);
         }
@@ -406,6 +433,7 @@ public final class OrbitView extends Region {
         }
         if (showTrails.get()) {
             drawTrails(g);
+            drawTwinTrails(g);
         }
         drawCentreOfMass(g);
         drawBodies(g);
@@ -461,6 +489,26 @@ public final class OrbitView extends Region {
                 }
                 g.stroke();
             }
+        }
+    }
+
+    /** Thin violet lines through the twin's recent positions (only while the twin rings are shown). */
+    private void drawTwinTrails(GraphicsContext g) {
+        if (twinPositions == null || twinTrails == null || twinTrails.size() < 2) {
+            return;
+        }
+        g.setLineWidth(1.0);
+        g.setLineDashes();
+        g.setStroke(TWIN_COLOUR.deriveColor(0, 1, 1, 0.55));
+        for (int body = 0; body < twinTrails.bodyCount(); body++) {
+            g.beginPath();
+            g.moveTo(camera.worldToScreenX(ReferenceFrame.x(twinTrails, body, 0, frame)),
+                    camera.worldToScreenY(ReferenceFrame.y(twinTrails, body, 0, frame)));
+            for (int k = 1; k < twinTrails.size(); k++) {
+                g.lineTo(camera.worldToScreenX(ReferenceFrame.x(twinTrails, body, k, frame)),
+                        camera.worldToScreenY(ReferenceFrame.y(twinTrails, body, k, frame)));
+            }
+            g.stroke();
         }
     }
 
@@ -675,10 +723,10 @@ public final class OrbitView extends Region {
         Vec3 p = s.position(selected);
         Vec3 v = s.velocity(selected);
         String[] lines = {
-                String.format(Locale.ROOT, "body %d   m = %g", selected + 1, system.mass(selected)),
-                String.format(Locale.ROOT, "pos  (%+.6f, %+.6f)", p.x(), p.y()),
-                String.format(Locale.ROOT, "vel  (%+.6f, %+.6f)", v.x(), v.y()),
-                String.format(Locale.ROOT, "|v|  %.6f", v.norm())
+            String.format(Locale.ROOT, "body %d   m = %g", selected + 1, system.mass(selected)),
+            String.format(Locale.ROOT, "pos  (%+.6f, %+.6f)", p.x(), p.y()),
+            String.format(Locale.ROOT, "vel  (%+.6f, %+.6f)", v.x(), v.y()),
+            String.format(Locale.ROOT, "|v|  %.6f", v.norm())
         };
         g.setFill(PANEL);
         g.fillRoundRect(12, 12, 290, 76, 8, 8);

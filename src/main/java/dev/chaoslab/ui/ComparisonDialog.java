@@ -11,6 +11,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.scene.Scene;
@@ -47,6 +49,9 @@ final class ComparisonDialog {
     private final Button saveButton = new Button("Save CSV...");
     private final Label status = new Label();
     private final TextArea output = new TextArea();
+    private final ComparisonPlot plot = new ComparisonPlot();
+    private AtomicBoolean cancelFlag = new AtomicBoolean();
+    private boolean running;
     private File directory;
     private Report lastReport;
     private int generation;
@@ -63,9 +68,9 @@ final class ComparisonDialog {
         heading.setWrapText(true);
         Label explain = new Label("Runs Euler, RK4, Velocity Verlet and Dormand-Prince with a fixed step, all at the"
                 + " scenario's step (shown below, adjusted slightly so the duration divides into whole steps), and"
-                + " measures each against a high-accuracy reference. The adaptive Dormand-Prince is not in this"
-                + " table; use the main window for it. The scenario is the applied one, not unapplied edits in the"
-                + " panel.");
+                + " the adaptive Dormand-Prince at tolerance 1e-10 (it picks its own steps, so its step column is the"
+                + " mean and its cost is not comparable), and measures each against a high-accuracy reference. The"
+                + " scenario is the applied one, not unapplied edits in the panel.");
         explain.setWrapText(true);
         explain.setStyle("-fx-text-fill: #9fb0c8;");
 
@@ -79,19 +84,25 @@ final class ComparisonDialog {
 
         status.setWrapText(true);
         status.setStyle(MONO + " -fx-text-fill: #22d3ee;");
+        plot.setPrefHeight(270);
+        plot.setManaged(false);
+        plot.setVisible(false);
         output.setEditable(false);
         output.setWrapText(false);
         output.setStyle(MONO + " -fx-control-inner-background: #0b1220; -fx-text-fill: #e5edf8;");
         VBox.setVgrow(output, Priority.ALWAYS);
 
-        VBox root = new VBox(8, heading, explain, row, status, output);
+        VBox root = new VBox(8, heading, explain, row, status, plot, output);
         root.setPadding(new Insets(12, 14, 12, 14));
         root.setStyle("-fx-background-color: #070b14;");
 
         window.setTitle("Compare integrators");
-        window.setScene(new Scene(root, 980, 620));
+        window.setScene(new Scene(root, 980, 780));
         window.initOwner(owner);
-        window.setOnHidden(e -> generation++); // a result still being computed is then ignored
+        window.setOnHidden(e -> {
+            generation++; // a result still being computed is then ignored
+            cancelFlag.set(true); // and the worker stops at its next sampling interval
+        });
 
         runButton.setOnAction(e -> run());
         durationField.setOnAction(e -> run());
@@ -111,7 +122,10 @@ final class ComparisonDialog {
     }
 
     private void run() {
-        if (runButton.isDisabled()) {
+        if (running) {
+            cancelFlag.set(true);
+            runButton.setDisable(true);
+            status.setText("Cancelling: the run stops at the end of the current sampling interval.");
             return;
         }
         ComparisonPlan.Plan plan;
@@ -122,9 +136,14 @@ final class ComparisonDialog {
             warn(e.getMessage());
             return;
         }
-        runButton.setDisable(true);
+        running = true;
+        runButton.setText("Cancel");
         saveButton.setDisable(true);
+        plot.setManaged(false);
+        plot.setVisible(false);
         output.setText("");
+        final AtomicBoolean myFlag = new AtomicBoolean();
+        cancelFlag = myFlag;
         status.setStyle(MONO + " -fx-text-fill: #22d3ee;");
         status.setText("Running " + plan.stepsPerMethod() + " steps for each of four methods, plus two reference"
                 + " runs. This can take a while for long durations; you can keep using the main window.");
@@ -134,7 +153,9 @@ final class ComparisonDialog {
             Report report = null;
             String failure = null;
             try {
-                report = ComparisonPlan.run(scenario.system(), scenario.initial(), scenario.stepSize(), chosen.duration());
+                report = ComparisonPlan.run(scenario.system(), scenario.initial(), scenario.stepSize(), chosen.duration(), myFlag::get);
+            } catch (CancellationException e) {
+                failure = "Cancelled.";
             } catch (NumericalFailureException e) {
                 failure = "The reference run itself failed, so there is nothing to compare against: " + e.getMessage()
                         + " This usually means a very close encounter inside the interval; try a shorter duration.";
@@ -153,6 +174,8 @@ final class ComparisonDialog {
         if (mine != generation) {
             return; // the window was closed or another run was started
         }
+        running = false;
+        runButton.setText("Run comparison");
         runButton.setDisable(false);
         if (report == null) {
             warn(problem);
@@ -176,6 +199,9 @@ final class ComparisonDialog {
             sb.append("  - ").append(line).append('\n');
         }
         output.setText(ComparisonPlan.wrapLines(sb.toString(), WRAP_COLUMNS));
+        plot.show(ComparisonSeries.of(report, timeScale), "time in " + unit);
+        plot.setManaged(true);
+        plot.setVisible(true);
     }
 
     private void warn(String text) {

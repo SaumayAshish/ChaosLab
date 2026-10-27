@@ -13,7 +13,7 @@ quantities apart on screen:
 
 The physics engine has no dependency on the user interface. The window only reads immutable snapshots.
 
-> Status: working research prototype. 455 automated tests pass (see [Verification](#verification)). The JavaFX classes themselves
+> Status: working research prototype. 480 automated tests pass (see [Verification](#verification)). The JavaFX classes themselves
 > have no automated tests; they were checked by hand in the running window.
 
 ## Screenshots
@@ -49,11 +49,13 @@ momentum is still conserved to rounding (1.8e-15) while angular momentum has dri
 - A reference trajectory (Dormand-Prince at tolerance 1e-13 with quintic Hermite interpolation) and its own uncertainty, so the
   window can say when the gap is below what the reference can resolve.
 - A Lyapunov exponent (Benettin method) with a rule that refuses to claim an exponent from too little data.
-- A twin run: the same system with one body moved by 1e-6 of the system size, to show sensitivity directly.
+- A twin run: the same system with one body (your choice of body and of the six axis directions) moved by 1e-6 of the system size,
+  to show sensitivity directly, drawn as violet rings and trails.
 - A plain-language explanation panel generated only from the measured numbers.
-- A "Compare integrators..." window: Euler, RK4, Velocity Verlet and fixed-step Dormand-Prince on the applied scenario at one
-  common step, against the reference, with a table and plain sentences that refuse to rank methods whose energy has left the true
-  motion or whose separation is below the reference's own uncertainty.
+- A "Compare integrators..." window: Euler, RK4, Velocity Verlet, fixed-step Dormand-Prince and adaptive Dormand-Prince
+  (tolerance 1e-10) on the applied scenario, against the reference, with a table, two log-scale plots of the samples (energy drift
+  and separation), and plain sentences that refuse to rank methods whose energy has left the true motion or whose separation is
+  below the reference's own uncertainty. A long comparison can be cancelled.
 - Each experiment states its relevant equations (force law, conserved quantities, and the formulas for that scenario).
 - Save and load experiments as JSON, and export the drift, error and twin curves as CSV.
 - Orbit view with trails, velocity vectors, labels, centre-of-mass marker, selectable reference frame, zoom, pan and fit.
@@ -92,7 +94,7 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 
 ## Verification
 
-- 455 JUnit 5 tests in 36 classes cover the physics, integrators, reference track, Lyapunov tracker, twin run, scenario
+- 480 JUnit 5 tests in 38 classes cover the physics, integrators, reference track, Lyapunov tracker, twin run, scenario
   validation, JSON and CSV input and output, and the explanation logic. Numbers quoted in the preset notes are pinned by tests.
 - Test strength was checked by mutation: a deliberate fault was introduced into the code and the test run had to fail. Faults
   that survived led to stronger tests or to removal of dead code (recorded in the milestone log).
@@ -111,9 +113,9 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - The orbit view draws the x-y projection.
 - The reference is itself a numerical solution and has a predictability horizon; the window reports when the gap falls below it.
 - Adaptive stepping needs Dormand-Prince specifically. It is not symplectic, so energy drifts slowly over very long runs.
-- The "Compare integrators" window uses fixed steps only (the adaptive Dormand-Prince is run from the main window), and it
-  and its background thread were checked by hand, not by automated tests; the planning, limits and wording behind it are tested.
-- The twin run draws rings only (no trails) and always nudges body 0 along +x.
+- The "Compare integrators" window, its plot and its background thread were checked by hand, not by automated tests; the
+  planning, limits, wording, plot scaling and cancellation behind it are tested.
+- The twin run's offset comes from the reading time, a few frames older than the display (visible only at very high speed).
 - Local development runs on JDK 26 compiling with `--release 25`; continuous integration builds and tests on Temurin 25
   (Ubuntu and Windows), and run #6 on commit e5270e6 passed.
 

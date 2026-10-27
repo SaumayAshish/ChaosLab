@@ -74,13 +74,16 @@ class ComparisonPlanTest {
     }
 
     @Test
-    void specsAreTheFourMethodsAtTheSameStepsPerSample() {
+    void specsAreFourFixedMethodsAtTheSameStepsPerSampleThenTheAdaptiveOne() {
         List<MethodSpec> specs = ComparisonPlan.specs(ComparisonPlan.plan(0.02, 628.0));
-        assertEquals(List.of("Euler", "RK4", "Velocity Verlet", "Dormand-Prince, fixed h"),
-                specs.stream().map(MethodSpec::label).toList());
-        for (MethodSpec s : specs) {
-            assertEquals(1570, s.stepsPerSample());
+        assertEquals(List.of("Euler", "RK4", "Velocity Verlet", "Dormand-Prince, fixed h",
+                "Dormand-Prince, adaptive"), specs.stream().map(MethodSpec::label).toList());
+        for (int i = 0; i < 4; i++) {
+            assertEquals(1570, specs.get(i).stepsPerSample());
+            assertEquals(null, specs.get(i).tolerances());
         }
+        assertEquals(1e-10, specs.get(4).tolerances().relative(), 0.0);
+        assertEquals(1e-10, specs.get(4).tolerances().absolute(), 0.0);
     }
 
     @Test
@@ -100,17 +103,28 @@ class ComparisonPlanTest {
     }
 
     @Test
+    void aCancelledRunStopsWithACancellationException() {
+        int[] polls = {0};
+        assertThrows(java.util.concurrent.CancellationException.class, () -> ComparisonPlan.run(
+                LongTermOrbit.system(), LongTermOrbit.state(), LongTermOrbit.STEP, 10.0 * LongTermOrbit.PERIOD,
+                () -> ++polls[0] > 3));
+        assertEquals(4, polls[0]);
+    }
+
+    @Test
     void realTenOrbitRunRanksEulerWorstAndDormandPrinceBestForEnergy() {
         Report r = ComparisonPlan.run(LongTermOrbit.system(), LongTermOrbit.state(), LongTermOrbit.STEP,
                 10.0 * LongTermOrbit.PERIOD);
-        assertEquals(4, r.results().size());
+        assertEquals(5, r.results().size());
         assertEquals(10.0 * LongTermOrbit.PERIOD, r.endTime() - r.startTime(), 1e-9);
         double euler = r.results().get(0).maxAbsEnergyDrift();
         double rk4 = r.results().get(1).maxAbsEnergyDrift();
         double dp = r.results().get(3).maxAbsEnergyDrift();
         assertTrue(euler > 0.5 && dp < rk4 && rk4 < 1e-4, euler + " " + rk4 + " " + dp);
         List<String> lines = ComparisonPlan.summary(r);
-        assertTrue(lines.get(0).startsWith("Smallest energy drift: Dormand-Prince, fixed h"), lines.get(0));
+        // the adaptive row reaches 6.5e-09 with half the steps of the fixed one (1.8e-08)
+        assertTrue(lines.get(0).startsWith("Smallest energy drift: Dormand-Prince, adaptive"), lines.get(0));
+        assertTrue(r.results().get(4).stepsCompleted() < r.results().get(3).stepsCompleted());
         // Euler gained about its whole energy, so it is named as invalid and left out of the ranking
         assertTrue(lines.get(0).contains("largest: Velocity Verlet"), lines.get(0));
         assertTrue(lines.stream().anyMatch(l -> l.startsWith("Euler changed the total energy by more than 10%")),

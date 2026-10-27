@@ -16,10 +16,11 @@ import dev.chaoslab.physics.State;
  * as large as the system itself and can grow no further.
  *
  * <h2>The nudge</h2>
- * Body 0 is moved along +x by {@link #NUDGE} times the system's characteristic length (the largest pair distance at the
+ * By default body 0 is moved along +x (a {@link Nudge} chooses any body and any of the six axis directions) by
+ * {@link #NUDGE} times the system's characteristic length (the largest pair distance at the
  * start, the same length that makes the gap plot dimensionless). Nothing else changes, so the pair starts with a
- * separation of exactly {@code NUDGE} in those units. The direction is fixed, so results are reproducible; a
- * different direction gives a different curve in detail but the same exponential rate in chaotic motion.
+ * separation of exactly {@code NUDGE} in those units. The choice is fixed, so results are reproducible; a
+ * different body or direction gives a different curve in detail but the same exponential rate in chaotic motion.
  *
  * <h2>Reading it</h2>
  * {@link Reading#separation()} is the largest distance between corresponding bodies of the two runs, in the system's
@@ -34,6 +35,64 @@ public final class TwinRun {
 
     /** The nudge as a fraction of the characteristic length. */
     public static final double NUDGE = 1e-6;
+
+    /** The six axis directions a body can be nudged along. */
+    public enum Direction {
+        PLUS_X("+x", 0, 1.0), MINUS_X("-x", 0, -1.0),
+        PLUS_Y("+y", 1, 1.0), MINUS_Y("-y", 1, -1.0),
+        PLUS_Z("+z", 2, 1.0), MINUS_Z("-z", 2, -1.0);
+
+        private final String label;
+        private final int axis;
+        private final double sign;
+
+        Direction(String label, int axis, double sign) {
+            this.label = label;
+            this.axis = axis;
+            this.sign = sign;
+        }
+
+        /** Axis index: 0 for x, 1 for y, 2 for z. */
+        public int axis() {
+            return axis;
+        }
+
+        /** +1 or -1. */
+        public double sign() {
+            return sign;
+        }
+
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    /**
+     * Which body is moved, and which way.
+     *
+     * @param body      index of the body (0-based)
+     * @param direction the direction of the displacement
+     */
+    public record Nudge(int body, Direction direction) {
+
+        /** Body 0 along +x: what the twin run always did before the choice existed. */
+        public static final Nudge DEFAULT = new Nudge(0, Direction.PLUS_X);
+
+        public Nudge {
+            if (body < 0) {
+                throw new IllegalArgumentException("body index must not be negative, got " + body);
+            }
+            if (direction == null) {
+                throw new IllegalArgumentException("direction must not be null");
+            }
+        }
+
+        /** Short description in the program's numbering (bodies are shown as m1, m2, ...), e.g. "m2 along -y". */
+        public String label() {
+            return "m" + (body + 1) + " along " + direction;
+        }
+    }
 
     /**
      * One answer. Lengths are in simulation length units.
@@ -75,20 +134,48 @@ public final class TwinRun {
      * @throws IllegalArgumentException                   for null arguments
      */
     public TwinRun(NBodySystem system, State start) {
-        if (system == null || start == null) {
-            throw new IllegalArgumentException("system and start state must not be null");
+        this(system, start, Nudge.DEFAULT);
+    }
+
+    /**
+     * @param system the system
+     * @param start  the unnudged initial state
+     * @param nudge  which body to move and in which direction
+     * @throws NBodySystem.SingularConfigurationException if either start state is singular
+     * @throws IllegalArgumentException                   for null arguments or a body index outside the system
+     */
+    public TwinRun(NBodySystem system, State start, Nudge nudge) {
+        if (system == null || start == null || nudge == null) {
+            throw new IllegalArgumentException("system, start state and nudge must not be null");
+        }
+        if (nudge.body() >= start.bodyCount()) {
+            throw new IllegalArgumentException("nudged body " + nudge.body() + " does not exist: the system has "
+                    + start.bodyCount() + " bodies");
         }
         this.start = start;
         this.length = characteristicLength(start);
         double firstStep = 1e-3 * shortestTimescale(system, start);
         this.first = new ReferenceTrack(system, start, firstStep, ReferenceTrack.DEFAULT_TOLERANCES);
-        this.second = new ReferenceTrack(system, nudged(start), firstStep, ReferenceTrack.DEFAULT_TOLERANCES);
+        this.second = new ReferenceTrack(system, nudged(start, nudge), firstStep, ReferenceTrack.DEFAULT_TOLERANCES);
     }
 
     /** The start state with body 0 moved by {@link #NUDGE} characteristic lengths along +x. */
     public static State nudged(State start) {
+        return nudged(start, Nudge.DEFAULT);
+    }
+
+    /**
+     * The start state with one body moved by {@link #NUDGE} characteristic lengths along one axis direction.
+     *
+     * @throws IllegalArgumentException if the body does not exist
+     */
+    public static State nudged(State start, Nudge nudge) {
+        if (nudge.body() >= start.bodyCount()) {
+            throw new IllegalArgumentException("nudged body " + nudge.body() + " does not exist: the system has "
+                    + start.bodyCount() + " bodies");
+        }
         double[] q = start.positions();
-        q[0] += NUDGE * characteristicLength(start);
+        q[3 * nudge.body() + nudge.direction().axis()] += nudge.direction().sign() * NUDGE * characteristicLength(start);
         return State.of(start.time(), q, start.velocities());
     }
 

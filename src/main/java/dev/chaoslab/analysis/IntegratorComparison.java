@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CancellationException;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -41,8 +43,12 @@ public final class IntegratorComparison {
     private IntegratorComparison() {
     }
 
-    /** One method to compare: a label, a factory for a fresh integrator, and the fixed steps taken per sample. */
-    public record MethodSpec(String label, Supplier<Integrator> factory, int stepsPerSample) {
+    /**
+     * One method to compare: a label, a factory for a fresh integrator, and the fixed steps taken per sample. A spec made
+     * with {@link #adaptive} instead runs the adaptive Dormand-Prince 5(4) at the given tolerances; its
+     * {@code stepsPerSample} is then 1 and unused, and the result reports the mean accepted step as its step size.
+     */
+    public record MethodSpec(String label, Supplier<Integrator> factory, int stepsPerSample, Tolerances tolerances) {
         public MethodSpec {
             if (label == null || label.isBlank()) {
                 throw new IllegalArgumentException("Method label must not be blank");
@@ -53,6 +59,19 @@ public final class IntegratorComparison {
             if (stepsPerSample <= 0) {
                 throw new IllegalArgumentException("stepsPerSample must be > 0, got " + stepsPerSample);
             }
+        }
+
+        /** A fixed-step method. */
+        public MethodSpec(String label, Supplier<Integrator> factory, int stepsPerSample) {
+            this(label, factory, stepsPerSample, null);
+        }
+
+        /** The adaptive Dormand-Prince 5(4) at the given tolerances. */
+        public static MethodSpec adaptive(String label, Tolerances tolerances) {
+            if (tolerances == null) {
+                throw new IllegalArgumentException("Tolerances must not be null");
+            }
+            return new MethodSpec(label, DormandPrince45Integrator::new, 1, tolerances);
         }
     }
 
@@ -149,6 +168,19 @@ public final class IntegratorComparison {
      * @throws NumericalFailureException if the <em>reference</em> trajectory itself cannot be computed
      */
     public static Report run(NBodySystem sys, State start, double endTime, int samples, List<MethodSpec> specs) {
+        return run(sys, start, endTime, samples, specs, () -> false);
+    }
+
+    /**
+     * As {@link #run(NBodySystem, State, double, int, List)}, but {@code cancelled} is polled before every sampling
+     * interval of the reference and of each method, and a true answer ends the run with a
+     * {@link CancellationException}. One interval, a twentieth of the run in the window, is not interruptible, so a
+     * cancel takes effect within that time.
+     *
+     * @throws CancellationException if {@code cancelled} returned true
+     */
+    public static Report run(NBodySystem sys, State start, double endTime, int samples, List<MethodSpec> specs,
+                             BooleanSupplier cancelled) {
         if (sys.bodyCount() != start.bodyCount()) {
             throw new IllegalArgumentException("State has " + start.bodyCount() + " bodies but the system has "
                     + sys.bodyCount());
@@ -165,8 +197,8 @@ public final class IntegratorComparison {
         }
 
         final double dt = (endTime - start.time()) / samples;
-        List<State> tight = referenceTrajectory(sys, start, dt, samples, REFERENCE_TIGHT);
-        List<State> loose = referenceTrajectory(sys, start, dt, samples, REFERENCE_LOOSE);
+        List<State> tight = referenceTrajectory(sys, start, dt, samples, REFERENCE_TIGHT, cancelled);
+        List<State> loose = referenceTrajectory(sys, start, dt, samples, REFERENCE_LOOSE, cancelled);
         double spread = 0.0;
         for (int k = 0; k <= samples; k++) {
             spread = Math.max(spread, maxSeparation(tight.get(k), loose.get(k)));
@@ -174,7 +206,9 @@ public final class IntegratorComparison {
 
         List<MethodResult> results = new ArrayList<>();
         for (MethodSpec spec : specs) {
-            results.add(runMethod(sys, start, dt, samples, tight, spec));
+            results.add(spec.tolerances() == null
+                    ? runMethod(sys, start, dt, samples, tight, spec, cancelled)
+                    : runAdaptive(sys, start, dt, samples, tight, spec, cancelled));
         }
         return new Report(start.time(), endTime, samples, Collections.unmodifiableList(tight), spread,
                 Collections.unmodifiableList(results));
@@ -183,12 +217,13 @@ public final class IntegratorComparison {
     // ---------------------------------------------------------------- internals
 
     private static List<State> referenceTrajectory(NBodySystem sys, State start, double dt, int samples,
-                                                   Tolerances tol) {
+                                                   Tolerances tol, BooleanSupplier cancelled) {
         List<State> states = new ArrayList<>(samples + 1);
         states.add(start);
         DormandPrince45Integrator dp = new DormandPrince45Integrator();
         State current = start;
         for (int k = 1; k <= samples; k++) {
+            checkCancelled(cancelled);
             double target = start.time() + k * dt;
             try {
                 current = dp.integrate(sys, current, target, dt / 10.0, tol, REFERENCE_MAX_STEPS_PER_SAMPLE)
@@ -202,8 +237,43 @@ public final class IntegratorComparison {
         return states;
     }
 
+    private static void checkCancelled(BooleanSupplier cancelled) {
+        if (cancelled.getAsBoolean()) {
+            throw new CancellationException("The comparison was cancelled");
+        }
+    }
+
+    private static MethodResult runAdaptive(NBodySystem sys, State start, double dt, int samples,
+                                            List<State> reference, MethodSpec spec, BooleanSupplier cancelled) {
+        DormandPrince45Integrator dp = new DormandPrince45Integrator();
+        final Diagnostics.Invariants i0 = Diagnostics.measure(sys, start);
+        List<Sample> out = new ArrayList<>(samples + 1);
+        out.add(new Sample(start.time(), 0.0, 0.0, 0.0));
+        State current = start;
+        long steps = 0;
+        String failure = null;
+        for (int k = 1; k <= samples && failure == null; k++) {
+            checkCancelled(cancelled);
+            try {
+                DormandPrince45Integrator.AdaptiveResult r = dp.integrate(sys, current, start.time() + k * dt,
+                        dt / 10.0, spec.tolerances(), REFERENCE_MAX_STEPS_PER_SAMPLE);
+                steps += (long) r.acceptedSteps() + r.rejectedSteps() + 1L; // the +1 is the shortened final step
+                current = r.finalState();
+                Diagnostics.Drift d = Diagnostics.drift(sys, start, i0, Diagnostics.measure(sys, current));
+                out.add(new Sample(current.time(), d.relativeEnergy(), d.relativeAngularMomentum(),
+                        maxSeparation(current, reference.get(k))));
+            } catch (ArithmeticException e) {
+                failure = e.getClass().getSimpleName() + ": " + e.getMessage();
+            }
+        }
+        double covered = out.get(out.size() - 1).time() - start.time();
+        double meanStep = steps > 0 ? covered / steps : Double.NaN;
+        return new MethodResult(spec.label(), dp.name() + " (adaptive)", meanStep, steps,
+                Collections.unmodifiableList(out), failure);
+    }
+
     private static MethodResult runMethod(NBodySystem sys, State start, double dt, int samples,
-                                          List<State> reference, MethodSpec spec) {
+                                          List<State> reference, MethodSpec spec, BooleanSupplier cancelled) {
         Integrator integrator = spec.factory().get();
         final double h = dt / spec.stepsPerSample();
         final Diagnostics.Invariants i0 = Diagnostics.measure(sys, start);
@@ -215,6 +285,7 @@ public final class IntegratorComparison {
         String failure = null;
 
         for (int k = 1; k <= samples && failure == null; k++) {
+            checkCancelled(cancelled);
             try {
                 for (int s = 0; s < spec.stepsPerSample(); s++) {
                     integrator.step(sys, q, v, h);
