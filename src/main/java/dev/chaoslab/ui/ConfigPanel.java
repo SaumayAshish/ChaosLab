@@ -74,7 +74,7 @@ public final class ConfigPanel extends VBox {
         }
     }
 
-    private static final double PANEL_WIDTH = 560.0;
+    private static final double PANEL_WIDTH = 640.0;
     private static final String CUSTOM_TITLE = "Custom scenario";
     private static final String GENERAL_NOTE = "Whether this scenario is regular or chaotic is not known in advance:"
             + " the sensitivity line reports what was measured. In chaotic motion a small numerical error grows"
@@ -284,7 +284,7 @@ public final class ConfigPanel extends VBox {
         register(ScenarioDraft.SOFTENING, softeningField);
         register(ScenarioDraft.STEP_SIZE, stepField);
 
-        bodiesGrid.setHgap(6);
+        bodiesGrid.setHgap(4);
         bodiesGrid.setVgap(5);
 
         addButton.setOnAction(e -> {
@@ -480,7 +480,7 @@ public final class ConfigPanel extends VBox {
             List<TextField> row = new ArrayList<>();
             for (int k = 0; k < ScenarioDraft.COMPONENTS.size(); k++) {
                 TextField f = new TextField(values.get(k));
-                f.setPrefColumnCount(7);
+                f.setPrefColumnCount(9);
                 Tooltip full = new Tooltip(); // long values are clipped in the field; the tooltip shows all digits
                 full.textProperty().bind(f.textProperty());
                 f.setTooltip(full);

@@ -291,7 +291,7 @@ public final class ChaosLabApp extends Application {
                     pane.setMaxHeight(open ? Double.MAX_VALUE : Region.USE_PREF_SIZE));
             VBox.setVgrow(pane, Priority.ALWAYS);
         }
-        configScroll.setPrefWidth(600);
+        configScroll.setPrefWidth(680);
 
         BorderPane root = new BorderPane();
         root.setTop(top);
