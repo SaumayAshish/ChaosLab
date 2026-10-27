@@ -3,14 +3,12 @@
 Ordered by how much each item improves the science or the trust in it, not by how visible it is.
 
 ## Next
-1. Read the CI job log of a green run and record the test count per operating system (run #6 passed on Temurin 25, but the
-   count has not yet been read from the log).
-2. Fix the remaining visual defects: the control bar wrapping in narrow windows and number fields that still clip values
+1. Fix the remaining visual defects: the control bar wrapping in narrow windows and number fields that still clip values
    longer than about 11 characters. (Legend and label overlaps were fixed and the fields widened on 2026-10-27.)
 
 ## Then
-- Watch the new comparison plot, the adaptive row, Cancel, and the twin nudge selectors and trails in the running window
-  (they compile and their logic is tested; the drawing has not been looked at yet).
+- Watch Cancel in the comparison window on a long run (its logic is tested; the button has not been clicked mid-run on
+  screen yet).
 - An `AdaptiveIntegrator` interface, once a second adaptive method exists (today adaptive stepping needs Dormand-Prince).
 - A loaded scenario that carries a start time (files currently always start at 0).
 

@@ -99,8 +99,9 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - Test strength was checked by mutation: a deliberate fault was introduced into the code and the test run had to fail. Faults
   that survived led to stronger tests or to removal of dead code (recorded in the milestone log).
 - Convergence orders measured: Euler 0.99, RK4 4.06, Verlet 2.00, Dormand-Prince fixed step 5.15 to 5.34.
-- Continuous integration (GitHub Actions, Temurin 25, Ubuntu and Windows) has passed on every run so far, including #6 on
-  2026-10-27.
+- Continuous integration (GitHub Actions, Temurin 25, Ubuntu and Windows) has passed on every run so far (11 runs; #11 on
+  commit a2dcbae, 2026-10-27). The per-system test count was read from the job logs of run #1: 426 tests on Ubuntu and on
+  Windows, the same as the local count at that commit.
 - See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for exactly what is and is not claimed.
 
 ## Documentation
@@ -117,7 +118,7 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
   planning, limits, wording, plot scaling and cancellation behind it are tested.
 - The twin run's offset comes from the reading time, a few frames older than the display (visible only at very high speed).
 - Local development runs on JDK 26 compiling with `--release 25`; continuous integration builds and tests on Temurin 25
-  (Ubuntu and Windows), and run #6 on commit e5270e6 passed.
+  (Ubuntu and Windows), and run #11 on commit a2dcbae passed.
 
 ## Licence
 
