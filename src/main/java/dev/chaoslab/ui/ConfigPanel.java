@@ -8,6 +8,7 @@ import dev.chaoslab.config.ScenarioDraft.Severity;
 import dev.chaoslab.config.ScenarioDraft.Validation;
 import dev.chaoslab.experiments.BinaryFlyby;
 import dev.chaoslab.experiments.FigureEight;
+import dev.chaoslab.experiments.LongTermOrbit;
 import dev.chaoslab.experiments.PythagoreanProblem;
 import dev.chaoslab.experiments.SunEarthMoon;
 import dev.chaoslab.physics.Diagnostics;
@@ -42,13 +43,14 @@ import javafx.scene.layout.VBox;
 public final class ConfigPanel extends VBox {
 
     /**
-     * A scenario the person has applied: the validated numbers, plus a title and a note for the explanation line.
-     * The note is a measured statement for presets and a general one for custom scenarios.
+     * A scenario the person has applied: the validated numbers, plus a title and a note for the explanation line and
+     * the equations behind it. The note is a measured statement for presets and a general one for custom scenarios;
+     * the equations always start with the force law and add what is specific to a preset.
      */
-    public record Applied(Scenario scenario, String title, String note) {
+    public record Applied(Scenario scenario, String title, String note, String equations) {
     }
 
-    private record Preset(String label, Supplier<ScenarioDraft> draft, String note) {
+    private record Preset(String label, Supplier<ScenarioDraft> draft, String note, String equations) {
         @Override
         public String toString() {
             return label;
@@ -77,6 +79,11 @@ public final class ConfigPanel extends VBox {
     private static final String GENERAL_NOTE = "Chaotic orbits have a finite predictability horizon: a small"
             + " numerical error grows exponentially, so conserved energy does not by itself mean the trajectory is"
             + " correct.";
+    /** The law every scenario obeys; a preset's own equations follow it. ASCII only, so it renders everywhere. */
+    private static final String COMMON_EQUATIONS = "Force on body i: a_i = G sum over j != i of m_j (r_j - r_i) /"
+            + " (|r_j - r_i|^2 + eps^2)^(3/2), where eps = 0 is exact Newtonian gravity and eps > 0 is softened (not"
+            + " Newtonian). Conserved by the exact motion: energy E = sum (1/2) m v^2 - G sum over pairs m_i m_j /"
+            + " |r_i - r_j|, momentum P = sum m v, angular momentum L = sum m (r x v).";
     private static final String ERROR_STYLE = "-fx-border-color: #fb7185; -fx-border-width: 1.5;";
     private static final String WARNING_STYLE = "-fx-border-color: #fbbf24; -fx-border-width: 1.5;";
     private static final List<String> COLUMN_TITLES = List.of("", "mass", "x", "y", "z", "vx", "vy", "vz");
@@ -86,11 +93,17 @@ public final class ConfigPanel extends VBox {
                     "Three equal masses on an equilateral triangle, which is unstable for equal masses (growth rate"
                             + " 0.537 per time unit), so expect it to break up. Energy conservation does not make a"
                             + " chaotic trajectory correct: at adaptive tolerance 1e-10 the positions are off by"
-                            + " 6e-4 at t = 60 and by 0.3 at t = 100 (measured against a 1e-13 run)."),
+                            + " 6e-4 at t = 60 and by 0.3 at t = 100 (measured against a 1e-13 run).",
+                    "Rigid rotation of the equilateral triangle with circumradius R: omega = sqrt(G m / (sqrt(3) "
+                            + "R^3)). For G = m = R = 1 that is 3^(-1/4) = 0.7598, so the period 2 pi / omega is 8.269. A small "
+                            + "displacement grows at the rate 0.537 per time unit, found by linearising the motion."),
             new Preset("Lagrange triangle, exact (unperturbed)", () -> ScenarioDraft.lagrange(0.0),
                     "The exact solution is a rigid rotation, but it is unstable (growth rate 0.537 per time unit),"
                             + " so rounding errors of about 1e-16 grow to order one after roughly ln(1e16)/0.537 = 69"
-                            + " time units."),
+                            + " time units.",
+                    "Rigid rotation of the equilateral triangle with circumradius R: omega = sqrt(G m / (sqrt(3) "
+                            + "R^3)). For G = m = R = 1 that is 3^(-1/4) = 0.7598, so the period 2 pi / omega is 8.269. A small "
+                            + "displacement grows at the rate 0.537 per time unit, found by linearising the motion."),
             new Preset("Figure-eight choreography (stable, three equal masses)",
                     () -> ScenarioDraft.of(FigureEight.system(), FigureEight.state(), 0.005),
                     "Three equal masses chase each other along one figure-eight curve (found numerically by Moore"
@@ -99,7 +112,10 @@ public final class ConfigPanel extends VBox {
                             + " stable orbit, so numerical error grows about linearly in time, not exponentially:"
                             + " Velocity Verlet with h = 0.01 is off by 2e-4 after one period and 3.7e-3 after ten"
                             + " (measured against a 1e-13 run). The rounded data themselves return to the start"
-                            + " within 2e-8 per period. Displace body 1 by 0.01 and the choreography is gone."),
+                            + " within 2e-8 per period. Displace body 1 by 0.01 and the choreography is gone.",
+                    "Three equal masses m = 1 with G = 1 on one closed curve, each a third of a period behind the one "
+                            + "before. Total energy E = -1.28714, momentum and angular momentum zero, period 6.3259 (computed "
+                            + "from the eight-digit start values)."),
             new Preset("Pythagorean 3-4-5 problem (Burrau, masses 3, 4, 5 at rest)",
                     () -> ScenarioDraft.of(PythagoreanProblem.system(), PythagoreanProblem.state(),
                             PythagoreanProblem.FIRST_STEP),
@@ -112,7 +128,9 @@ public final class ConfigPanel extends VBox {
                             + " by 2.4 at t = 2), so choose Dormand-Prince adaptive with tolerance 1e-10 (off by"
                             + " 2e-7 at t = 10 and 2e-4 at t = 40). After about t = 55 even the reference is"
                             + " uncertain (the 1e-13 and 1e-14 runs differ by 0.13 at t = 60), so only the question"
-                            + " of who escapes can be trusted there."),
+                            + " of who escapes can be trusted there.",
+                    "All three bodies start at rest, so P = 0 and L = 0. Total energy E = -769/60 = -12.8167, the sum "
+                            + "of the three pair terms -G m_i m_j / r_ij for the 3-4-5 start."),
             new Preset("Binary flyby (a close scattering encounter)",
                     () -> ScenarioDraft.of(BinaryFlyby.system(), BinaryFlyby.state(), BinaryFlyby.FIRST_STEP),
                     "A light intruder (mass 0.5) flies past a circular equal-mass binary (masses 1, separation 1)"
@@ -130,7 +148,10 @@ public final class ConfigPanel extends VBox {
                             + " of the pass. Every fixed step fails at t = 12: at t = 13 Velocity Verlet with"
                             + " h = 0.005 is off by 2 and RK4 with h = 0.005 by 3.5, although both were accurate to"
                             + " 1e-4 and 1e-9 at t = 10. Choose Dormand-Prince adaptive with tolerance 1e-10 (off by"
-                            + " 1e-5 at t = 80; tolerance 1e-6 is off by 0.9)."),
+                            + " 1e-5 at t = 80; tolerance 1e-6 is off by 0.9).",
+                    "Energy of the binary alone: E_b = (1/2) mu v^2 - G m_a m_b / r with mu = m_a m_b / (m_a + m_b). "
+                            + "Its semi-major axis is a = -G m_a m_b / (2 E_b) and its period T = 2 pi sqrt(a^3 / (G (m_a + "
+                            + "m_b))). With the measured E_b = -0.676 and masses 1 and 1: a = 0.740 and T = 2.83."),
             new Preset("Sun, Earth and Moon (hierarchical, SI units)",
                     () -> ScenarioDraft.of(SunEarthMoon.system(), SunEarthMoon.state(), SunEarthMoon.STEP),
                     "NASA fact-sheet masses and mean Earth-Moon distance (384,400 km), both orbits circular and in"
@@ -141,17 +162,45 @@ public final class ConfigPanel extends VBox {
                             + " 388,200 km, and the Moon turns once in 27.06 days (real sidereal period 27.32 days;"
                             + " the start is not the real orbit). Velocity Verlet with h = 3600 s misplaces the"
                             + " Moon-Earth distance by 14 km after a year, and by 3.6 km with h = 1800 s. The motion"
-                            + " is regular, so the window withholds a Lyapunov exponent. Time is shown in days."),
+                            + " is regular, so the window withholds a Lyapunov exponent. Time is shown in days.",
+                    "Circular relative speed v = sqrt(G (M + m) / a) and Kepler period T = 2 pi sqrt(a^3 / (G (M + "
+                            + "m))): 365.26 days for Earth around the Sun, 27.29 days for the Moon around the Earth from these "
+                            + "start values. The Sun pulls the Moon G M_sun / d_sun^2 and the Earth pulls it G M_earth / "
+                            + "d_moon^2; their ratio is 2.19."),
             new Preset("Two bodies, circular orbit", ScenarioDraft::twoBodyCircular,
                     "A regular orbit: nearby orbits separate only linearly in time, so numerical error stays small"
-                            + " for many periods, unlike the chaotic three-body cases."),
+                            + " for many periods, unlike the chaotic three-body cases.",
+                    "Circular relative speed v = sqrt(G (m_1 + m_2) / a) = sqrt(2) for G = 1, masses 1 and 1, "
+                            + "separation a = 1. Period T = 2 pi sqrt(a^3 / (G (m_1 + m_2))) = 4.443."),
             new Preset("Two bodies, eccentric orbit (e = 0.75)", ScenarioDraft::twoBodyEccentric,
                     "The bodies pass close at pericentre every orbit. That is where a fixed step loses accuracy"
-                            + " and where an adaptive step shrinks."),
+                            + " and where an adaptive step shrinks.",
+                    "Released at apocentre r_a = a (1 + e) = 1 with relative speed sqrt(1/2). The vis-viva relation "
+                            + "v^2 = G (m_1 + m_2) (2 / r - 1 / a) gives a = 4/7 = 0.571 and e = 0.75. Period T = 2 pi sqrt(a^3 "
+                            + "/ (G (m_1 + m_2))) = 1.919."),
+            new Preset("Long-term integration (a planet on an eccentric orbit)",
+                    () -> ScenarioDraft.of(LongTermOrbit.system(), LongTermOrbit.state(), LongTermOrbit.STEP),
+                    "A planet (mass 0.001) on an exact Kepler ellipse (a = 1, e = 0.5, period 6.2800) round a star"
+                            + " of mass 1, started at periapsis. The exact motion repeats and conserves energy, so"
+                            + " every drift you see is the integrator's. Measured over 100 orbits at h = 0.02 (314"
+                            + " steps per orbit) against a 1e-13 reference: Velocity Verlet's energy error stays"
+                            + " bounded (1.1e-3 at most) and its angular momentum is conserved to 3e-14, but its"
+                            + " planet drifts ahead in phase (position off by 1.3 after 100 orbits). RK4 loses"
+                            + " energy steadily, 9.7e-8 per orbit (9.7e-6 after 100), with the planet off by 8e-3."
+                            + " Dormand-Prince at the same step drifts 1.8e-9 per orbit (position off by 1.4e-4)."
+                            + " Euler spirals outwards and has gained about its whole energy by orbit 50. A drift"
+                            + " that grows linearly will eventually pass a bounded one: RK4's passed Verlet's at"
+                            + " about orbit 11,000 in a run of 15,000 orbits. Run it with the speed slider up and"
+                            + " read the drift plot; switch integrators and restart to compare.",
+                    "Relative orbit: periapsis a (1 - e) = 0.5, speed there sqrt(G M (1 + e) / (a (1 - e))) with M = "
+                            + "m_1 + m_2 = 1.001; period T = 2 pi sqrt(a^3 / (G M)) = 6.2800. Exact energy E = -G m_1 m_2 / "
+                            + "(2 a) = -5e-4 and angular momentum L = m_1 m_2 sqrt(G a (1 - e^2) / M), both constant."),
             new Preset("Sun and Earth, circular orbit (SI units)", ScenarioDraft::sunEarth,
                     "Rounded published masses and distance, circular orbit, so the real eccentricity"
                             + " of about 0.017 is ignored. One orbit takes 365.26 days. Time is shown in days and the"
-                            + " speed is in days per second."));
+                            + " speed is in days per second.",
+                    "Circular relative speed v = sqrt(G (M + m) / a) = 29.78 km/s for a = 1 AU, and Kepler period T = "
+                            + "2 pi sqrt(a^3 / (G (M + m))) = 365.26 days."));
 
     private final Consumer<Applied> onApply;
 
@@ -319,6 +368,12 @@ public final class ConfigPanel extends VBox {
         return matchesLoaded() ? loadedPreset.note() : GENERAL_NOTE;
     }
 
+    /** The equations that go with {@link #currentTitle()}: the force law, then what is specific to a preset. */
+    public String currentEquations() {
+        String own = matchesLoaded() ? loadedPreset.equations() : "";
+        return own.isBlank() ? COMMON_EQUATIONS : COMMON_EQUATIONS + "\n\n" + own;
+    }
+
     /**
      * Puts a scenario read from a file into the fields and, if it is valid for the current integrator kind, applies it
      * at once. The title and note stay attached to it only while the fields are unedited, exactly like a preset. If it
@@ -332,7 +387,7 @@ public final class ConfigPanel extends VBox {
     public Validation loadAndApply(ScenarioDraft d, String title, String note) {
         String t = title == null || title.isBlank() ? "Loaded experiment" : title;
         String n = note == null || note.isBlank() ? GENERAL_NOTE : note;
-        loadedPreset = new Preset(t, () -> d, n);
+        loadedPreset = new Preset(t, () -> d, n, "");
         loadedPresetDraft = d;
         setFields(d);
         Validation v = lastValidation;
@@ -524,6 +579,6 @@ public final class ConfigPanel extends VBox {
 
     /** A preset keeps its title and measured note only while the fields still match it exactly. */
     private Applied buildApplied(Scenario scenario) {
-        return new Applied(scenario, currentTitle(), currentNote());
+        return new Applied(scenario, currentTitle(), currentNote(), currentEquations());
     }
 }

@@ -5,10 +5,12 @@ Ordered by how much each item improves the science or the trust in it, not by ho
 ## Next
 1. Run the whole test suite on a real Java 25 runtime and record the result (all development runs so far used JDK 26.0.2 with
    `--release 25`).
-2. Check the nine presets against the original list of required experiments, and add any that are missing.
-3. See and fix the remaining visual defects: legend and label overlaps in the orbit view and the error plot, number fields that clip
-   long values, the control bar wrapping in narrow windows.
-4. Add screenshots taken from the running application.
+2. Extend the in-window integrator comparison. All seven experiments of the original brief are now covered (stable orbit,
+   figure-eight, chaotic scattering, nearby initial conditions, integrator comparison, close encounter, long-term integration),
+   each with its equations. Still missing: the adaptive Dormand-Prince as a row of the comparison (the engine compares fixed
+   steps only), cancelling a long comparison, and a plot of the comparison samples.
+3. Fix the remaining visual defects: number fields that clip long values, and the control bar wrapping in narrow windows.
+   (The legend and label overlaps were fixed on 2026-10-27.)
 
 ## Then
 - Apply of an edited custom scenario, and the "Reference (ghost)" switch turned off: both compile and are specified but have not

@@ -13,7 +13,7 @@ quantities apart on screen:
 
 The physics engine has no dependency on the user interface. The window only reads immutable snapshots.
 
-> Status: working research prototype. 426 automated tests pass (see [Verification](#verification)). The JavaFX classes themselves
+> Status: working research prototype. 455 automated tests pass (see [Verification](#verification)). The JavaFX classes themselves
 > have no automated tests; they were checked by hand in the running window.
 
 ## Screenshots
@@ -29,6 +29,18 @@ exponent of 0.348 per unit time. The right column shows the scenario editor with
 *Lagrange triangle with body 1 displaced by 0.01, velocity Verlet with h = 0.005, at t = 0 before the first step: the numerical
 error is exactly zero because the displayed run is the reference's starting state. The preset note states the measured outcome.*
 
+![The figure-eight choreography with velocity Verlet: the run stays on the reference curve](docs/images/Figure-eight-choreography.png)
+
+*Figure-eight choreography, velocity Verlet with h = 0.005, paused at t = 24.20. The displayed run agrees with the 1e-13
+reference to about 3 digits (gap 1.51e-04 of the system size). The energy-drift curve oscillates, with a drift of 1.9e-07 at this
+moment, and the explanation panel calls the run conserved and accurate.*
+
+![The same figure-eight with explicit Euler: the bodies have spiralled off the reference curve](docs/images/Euler-figure-eight.png)
+
+*The same preset and step size with explicit Euler, paused at t = 24.78. The gap to the reference is 0.28 of the system size
+and the energy has drifted by 3.0e-01 of its starting size; the trails spiral outward away from the dashed reference. Linear
+momentum is still conserved to rounding (1.8e-15) while angular momentum has drifted by 1.8e-03.*
+
 ## What it does
 
 - Newtonian gravity in normalised units or SI units, for 2 to 8 bodies. Optional Plummer softening is always labelled non-Newtonian.
@@ -39,6 +51,10 @@ error is exactly zero because the displayed run is the reference's starting stat
 - A Lyapunov exponent (Benettin method) with a rule that refuses to claim an exponent from too little data.
 - A twin run: the same system with one body moved by 1e-6 of the system size, to show sensitivity directly.
 - A plain-language explanation panel generated only from the measured numbers.
+- A "Compare integrators..." window: Euler, RK4, Velocity Verlet and fixed-step Dormand-Prince on the applied scenario at one
+  common step, against the reference, with a table and plain sentences that refuse to rank methods whose energy has left the true
+  motion or whose separation is below the reference's own uncertainty.
+- Each experiment states its relevant equations (force law, conserved quantities, and the formulas for that scenario).
 - Save and load experiments as JSON, and export the drift, error and twin curves as CSV.
 - Orbit view with trails, velocity vectors, labels, centre-of-mass marker, selectable reference frame, zoom, pan and fit.
 
@@ -51,6 +67,7 @@ error is exactly zero because the displayed run is the reference's starting stat
 | Lagrange triangle, exact and displaced by 0.01 | An exact solution that is unstable: the exponent is known analytically (0.5372850) |
 | Figure-eight choreography | A stable periodic three-body orbit; a 1 % displacement destroys it |
 | Pythagorean 3-4-5 problem (Burrau) | Strong chaos with close passes; after a body is ejected, two references at tolerance 1e-13 and 1e-14 disagree by 2.1 at t = 70 |
+| Long-term integration (planet, e = 0.5, 100 orbits at h = 0.02) | Slow systematic error: Velocity Verlet's energy error stays bounded (about 1e-3) while RK4 and fixed-step Dormand-Prince drift linearly; measured numbers are in the preset note |
 | Binary flyby | A limitation case: the outcome is not chaotic but fixed steps fail at a close pass (a time-scale problem) |
 | Sun, Earth and Moon (SI units) | Hierarchical system; regular motion; the exponent estimate correctly falls toward zero |
 
@@ -75,7 +92,7 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 
 ## Verification
 
-- 426 JUnit 5 tests in 34 classes cover the physics, integrators, reference track, Lyapunov tracker, twin run, scenario
+- 455 JUnit 5 tests in 36 classes cover the physics, integrators, reference track, Lyapunov tracker, twin run, scenario
   validation, JSON and CSV input and output, and the explanation logic. Numbers quoted in the preset notes are pinned by tests.
 - Test strength was checked by mutation: a deliberate fault was introduced into the code and the test run had to fail. Faults
   that survived led to stronger tests or to removal of dead code (recorded in the milestone log).
@@ -93,6 +110,8 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - The orbit view draws the x-y projection.
 - The reference is itself a numerical solution and has a predictability horizon; the window reports when the gap falls below it.
 - Adaptive stepping needs Dormand-Prince specifically. It is not symplectic, so energy drifts slowly over very long runs.
+- The "Compare integrators" window uses fixed steps only (the adaptive Dormand-Prince is run from the main window), and it
+  and its background thread were checked by hand, not by automated tests; the planning, limits and wording behind it are tested.
 - The twin run draws rings only (no trails) and always nudges body 0 along +x.
 - Development so far has run on JDK 26 compiling with `--release 25`, not yet on a Java 25 runtime.
 

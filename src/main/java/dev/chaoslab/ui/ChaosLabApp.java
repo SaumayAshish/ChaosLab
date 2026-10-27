@@ -148,6 +148,7 @@ public final class ChaosLabApp extends Application {
     private final Label twinLine = new Label();
     private final Label fileLine = new Label();
     private final VBox explainBox = new VBox(8);
+    private final Label equationsText = new Label();
     private Snapshot latestSnapshot;
     private long lastExplainNanos;
     private String lastExplainKey = "";
@@ -229,6 +230,9 @@ public final class ChaosLabApp extends Application {
         CheckBox vectorsBox = new CheckBox("Vectors");
         CheckBox ghostBox = new CheckBox("Reference (ghost)");
         CheckBox autoFitBox = new CheckBox("Auto-fit");
+        Button compareButton = new Button("Compare integrators...");
+        compareButton.setTooltip(new Tooltip("Runs Euler, RK4, Velocity Verlet and fixed-step Dormand-Prince on the"
+                + " applied scenario at its step and compares their energy drift and position with a reference."));
         Button saveButton = new Button("Save experiment...");
         Button loadButton = new Button("Load experiment...");
         Button exportButton = new Button("Export CSV...");
@@ -246,7 +250,7 @@ public final class ChaosLabApp extends Application {
                 new Label("Speed"), speedSlider, speedLabel, new Label("Integrator"), integratorBox,
                 new Label("Frame"), frameBox,
                 fitButton, resetViewButton, autoFitBox, trailsBox, vectorsBox, ghostBox, twinBox,
-                saveButton, loadButton, exportButton);
+                compareButton, saveButton, loadButton, exportButton);
         controls.setPadding(new Insets(8, 14, 10, 14));
         controls.setStyle("-fx-alignment: center-left;");
 
@@ -261,7 +265,12 @@ public final class ChaosLabApp extends Application {
         explainNote.setStyle("-fx-text-fill: #6b7c96; -fx-font-size: 11px;");
         explainNote.setWrapText(true);
         explainNote.setMaxWidth(520);
-        VBox explainSection = new VBox(8, explainNote, explainBox);
+        Label equationsHeading = new Label("Equations");
+        equationsHeading.setStyle("-fx-text-fill: #a78bfa; -fx-font-size: 12px; -fx-font-weight: bold;");
+        equationsText.setWrapText(true);
+        equationsText.setMaxWidth(520);
+        equationsText.setStyle("-fx-text-fill: #c9d6ea; -fx-font-size: 12px; -fx-font-family: 'Consolas';");
+        VBox explainSection = new VBox(8, explainNote, explainBox, new VBox(2, equationsHeading, equationsText));
         explainSection.setPadding(new Insets(4, 14, 16, 14));
         explainSection.setStyle("-fx-background-color: #0b1220;");
         // two sections that can be folded; each scrolls inside itself, so both title bars stay on screen
@@ -322,6 +331,7 @@ public final class ChaosLabApp extends Application {
         saveButton.setOnAction(e -> saveExperiment());
         loadButton.setOnAction(e -> loadExperiment());
         exportButton.setOnAction(e -> exportCsv());
+        compareButton.setOnAction(e -> compareIntegrators());
         fitButton.setOnAction(e -> view.fitNow());
         resetViewButton.setOnAction(e -> view.resetView());
         speedSlider.valueProperty().addListener((o, was, is) -> {
@@ -445,6 +455,17 @@ public final class ChaosLabApp extends Application {
     }
 
     // ---------------------------------------------------------------- files
+
+    /** Opens the integrator comparison window for the applied scenario. */
+    private void compareIntegrators() {
+        Scenario scenario = applied.scenario();
+        double step = scenario.stepSize();
+        double elapsed = latestSnapshot == null ? 0.0 : latestSnapshot.state().time() - scenario.initial().time();
+        // suggest the time already simulated if it is a useful length, otherwise a thousand steps
+        double suggested = elapsed >= 20.0 * step ? Math.min(elapsed, 100_000.0 * step) : 1000.0 * step;
+        ComparisonDialog.open(stage, applied.title(), scenario, timeScale, timeScale == 1.0 ? "t" : "d", suggested,
+                lastDirectory);
+    }
 
     /** Writes the scenario panel's values and the integrator to a JSON file chosen by the person. */
     private void saveExperiment() {
@@ -648,6 +669,7 @@ public final class ChaosLabApp extends Application {
         timeScale = system.gravitationalConstant() == NBodySystem.G_SI ? SECONDS_PER_DAY : 1.0;
         speedLabel.setText(speedText());
         scenarioLabel.setText(applied.title() + ". " + applied.note());
+        equationsText.setText(applied.equations());
 
         IntegratorOption option = integratorBox.getValue();
         SimulationConfig config = option.tolerances() == null
