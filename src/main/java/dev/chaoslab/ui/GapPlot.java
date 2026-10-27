@@ -49,6 +49,10 @@ public final class GapPlot extends Region {
     private static final Color UNCERTAINTY_FILL = Color.web("#9fb0c8", 0.14);
     private static final Color SIZE_LINE = Color.web("#fb7185", 0.6);
     private static final Color ROUNDING = Color.web("#9fb0c8", 0.75);
+    /** Dark plate behind a text label, so a curve passing underneath does not make it unreadable. */
+    private static final Color LABEL_PLATE = Color.web("#070b14", 0.8);
+    /** Approximate width of one character of the 11 px monospaced font, used to size the plates. */
+    private static final double CHARACTER_WIDTH = 6.7;
 
     private static final double ROUNDING_UNIT = 1.1102230246251565e-16; // 2^-53
 
@@ -144,10 +148,8 @@ public final class GapPlot extends Region {
 
         g.setFont(Font.font("Consolas", 11));
         drawGrid(g, axis, left, right, top, bottom);
-        drawReferenceLine(g, axis, 1.0, "error = size of the system", SIZE_LINE, left, right, top, bottom, 13.0,
-                false);
-        drawReferenceLine(g, axis, ROUNDING_UNIT, "double-precision rounding 1.1e-16", ROUNDING, left, right, top,
-                bottom, -4.0, true);
+        drawReferenceLine(g, axis, 1.0, SIZE_LINE, left, right, top, bottom);
+        drawReferenceLine(g, axis, ROUNDING_UNIT, ROUNDING, left, right, top, bottom);
 
         double t0 = n == 0 ? 0.0 : history.startTime();
         double t1 = n == 0 ? 1.0 : history.time(n - 1);
@@ -168,6 +170,11 @@ public final class GapPlot extends Region {
         if (m >= 1) {
             plotTwin(g, axis, t0, t1, left, right, top, bottom, m);
         }
+        // the labels of the two reference lines go on top of the curves, on a backing plate, so a curve never crosses them
+        drawReferenceLabel(g, axis, 1.0, "error = size of the system", SIZE_LINE, left, right, top, bottom, 13.0,
+                false);
+        drawReferenceLabel(g, axis, ROUNDING_UNIT, "double-precision rounding 1.1e-16", ROUNDING, left, right, top,
+                bottom, -4.0, true);
         drawLegend(g, left, top);
 
         g.setStroke(FRAME);
@@ -187,17 +194,27 @@ public final class GapPlot extends Region {
         }
     }
 
-    private void drawReferenceLine(GraphicsContext g, LogAxis axis, double value, String text, Color colour,
-                                   double left, double right, double top, double bottom, double textOffset, boolean labelAtRight) {
+    private void drawReferenceLine(GraphicsContext g, LogAxis axis, double value, Color colour, double left,
+                                   double right, double top, double bottom) {
         double y = yFor(value, axis, top, bottom);
         g.setStroke(colour);
         g.setLineWidth(1.0);
         g.setLineDashes(5.0, 4.0);
         g.strokeLine(left, y, right, y);
         g.setLineDashes();
+    }
+
+    private void drawReferenceLabel(GraphicsContext g, LogAxis axis, double value, String text, Color colour,
+                                    double left, double right, double top, double bottom, double textOffset, boolean labelAtRight) {
+        double y = yFor(value, axis, top, bottom);
+        double width = text.length() * CHARACTER_WIDTH + 8.0;
+        double textX = labelAtRight ? right - 6.0 : left + 6.0;
+        double plateX = labelAtRight ? textX - width + 4.0 : textX - 4.0;
+        g.setFill(LABEL_PLATE);
+        g.fillRect(plateX, y + textOffset - 11.0, width, 14.0);
         g.setFill(colour);
         g.setTextAlign(labelAtRight ? TextAlignment.RIGHT : TextAlignment.LEFT);
-        g.fillText(text, labelAtRight ? right - 6.0 : left + 6.0, y + textOffset);
+        g.fillText(text, textX, y + textOffset);
     }
 
     private void drawTimeAxis(GraphicsContext g, double t0, double t1, double left, double right, double bottom,

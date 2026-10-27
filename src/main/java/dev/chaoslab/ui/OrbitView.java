@@ -74,6 +74,8 @@ public final class OrbitView extends Region {
     private static final Color TWIN_COLOUR = Color.web("#a78bfa");
     private static final Color SCALE_BAR = Color.web("#6b7c96");
     private static final Color PANEL = Color.web("#0d1424", 0.85);
+    /** Approximate width of one character of the 11 px monospaced legend font, used to size the plate behind it. */
+    private static final double LEGEND_CHARACTER_WIDTH = 6.7;
     private static final Color[] PALETTE = {
             Color.web("#22d3ee"), // cyan
             Color.web("#a78bfa"), // violet
@@ -608,6 +610,25 @@ public final class OrbitView extends Region {
         double px = length * camera.scale();
         double x = 16.0;
         double y = h - 20.0;
+        // the legend lines, bottom to top
+        java.util.List<String> lines = new java.util.ArrayList<>();
+        lines.add(String.format(Locale.ROOT, "%.3g length units", length));
+        lines.add(String.format(Locale.ROOT, "arrows: 1 velocity unit = %.3g px", pixelsPerVelocity));
+        if (showGhost.get()) {
+            lines.add("dashed rings and trails: high-accuracy reference");
+        }
+        if (frame >= 0) {
+            lines.add("frame: relative to m" + (frame + 1) + " (fitted to the bodies near it)");
+        }
+        // a plate behind the whole block, so a body or trail passing under it does not make the text unreadable
+        int longest = 0;
+        for (String line : lines) {
+            longest = Math.max(longest, line.length());
+        }
+        double plateWidth = Math.max(px, longest * LEGEND_CHARACTER_WIDTH) + 14.0;
+        double plateTop = y - 8.0 - 16.0 * (lines.size() - 1) - 13.0;
+        g.setFill(PANEL);
+        g.fillRect(x - 8.0, plateTop, plateWidth, y + 9.0 - plateTop);
         g.setStroke(SCALE_BAR);
         g.setLineWidth(1.2);
         g.strokeLine(x, y, x + px, y);
@@ -615,13 +636,8 @@ public final class OrbitView extends Region {
         g.strokeLine(x + px, y - 4, x + px, y + 4);
         g.setFill(LABEL);
         g.setFont(Font.font("Consolas", 11));
-        g.fillText(String.format(Locale.ROOT, "%.3g length units", length), x, y - 8);
-        g.fillText(String.format(Locale.ROOT, "arrows: 1 velocity unit = %.3g px", pixelsPerVelocity), x, y - 24);
-        if (showGhost.get()) {
-            g.fillText("dashed rings and trails: high-accuracy reference", x, y - 40);
-        }
-        if (frame >= 0) {
-            g.fillText("frame: relative to m" + (frame + 1) + " (fitted to the bodies near it)", x, y - 56);
+        for (int i = 0; i < lines.size(); i++) {
+            g.fillText(lines.get(i), x, y - 8.0 - 16.0 * i);
         }
     }
 
