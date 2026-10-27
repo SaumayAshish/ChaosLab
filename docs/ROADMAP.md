@@ -3,8 +3,8 @@
 Ordered by how much each item improves the science or the trust in it, not by how visible it is.
 
 ## Next
-1. Run the whole test suite on a real Java 25 runtime and record the result (all development runs so far used JDK 26.0.2 with
-   `--release 25`).
+1. Read the CI job log of a green run and record the test count per operating system (run #6 passed on Temurin 25, but the
+   count has not yet been read from the log).
 2. Extend the in-window integrator comparison. All seven experiments of the original brief are now covered (stable orbit,
    figure-eight, chaotic scattering, nearby initial conditions, integrator comparison, close encounter, long-term integration),
    each with its equations. Still missing: the adaptive Dormand-Prince as a row of the comparison (the engine compares fixed

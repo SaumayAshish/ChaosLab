@@ -97,7 +97,8 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - Test strength was checked by mutation: a deliberate fault was introduced into the code and the test run had to fail. Faults
   that survived led to stronger tests or to removal of dead code (recorded in the milestone log).
 - Convergence orders measured: Euler 0.99, RK4 4.06, Verlet 2.00, Dormand-Prince fixed step 5.15 to 5.34.
-- The first continuous-integration run (2026-10-26) passed on Ubuntu and Windows.
+- Continuous integration (GitHub Actions, Temurin 25, Ubuntu and Windows) has passed on every run so far, including #6 on
+  2026-10-27.
 - See [docs/REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md) for exactly what is and is not claimed.
 
 ## Documentation
@@ -113,7 +114,8 @@ java -cp target/classes dev.chaoslab.cli.ChaosDemo
 - The "Compare integrators" window uses fixed steps only (the adaptive Dormand-Prince is run from the main window), and it
   and its background thread were checked by hand, not by automated tests; the planning, limits and wording behind it are tested.
 - The twin run draws rings only (no trails) and always nudges body 0 along +x.
-- Development so far has run on JDK 26 compiling with `--release 25`, not yet on a Java 25 runtime.
+- Local development runs on JDK 26 compiling with `--release 25`; continuous integration builds and tests on Temurin 25
+  (Ubuntu and Windows), and run #6 on commit e5270e6 passed.
 
 ## Licence
 
